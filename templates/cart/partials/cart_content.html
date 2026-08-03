@@ -1,0 +1,56 @@
+{% load catalog_extras %}
+{% if items %}
+  <div class="table-wrap">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>SKU</th><th>产品</th><th>属性</th><th>单价</th><th>数量</th><th>金额</th><th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in items %}
+          <tr>
+            <td>{{ item.sku.internal_sku_code }}</td>
+            <td><a href="{{ item.sku.product.get_absolute_url }}">{{ item.sku.display_name }}</a></td>
+            <td>{{ item.sku.sku_attribute_text }}</td>
+            <td>
+              {% if request.user.is_authenticated %}
+                {% if item.sku.price %}{{ item.sku.price }}{% else %}待确认{% endif %}
+              {% else %}-{% endif %}
+            </td>
+            <td>
+              <form class="inline-form cart-quantity-form js-cart-quantity" method="post" action="{% url 'cart:update' item.sku.id %}">
+                {% csrf_token %}
+                {% if cart_return_url %}<input type="hidden" name="next" value="{{ cart_return_url }}">{% endif %}
+                <div class="quantity-stepper quantity-stepper--compact" aria-label="调整购物车数量">
+                  <button type="button" class="quantity-step-button" data-quantity-change="-1" aria-label="减少数量">&minus;</button>
+                  <input name="qty" type="number" min="{{ item.sku.moq|qty }}" step="{{ item.sku.order_step|qty }}" value="{{ item.qty|qty }}" aria-label="购物车数量">
+                  <button type="button" class="quantity-step-button" data-quantity-change="1" aria-label="增加数量">+</button>
+                </div>
+              </form>
+            </td>
+            <td>
+              {% if request.user.is_authenticated %}
+                {% if item.amount %}{{ item.amount }}{% else %}待确认{% endif %}
+              {% else %}-{% endif %}
+            </td>
+            <td>
+              <form method="post" action="{% url 'cart:remove' item.sku.id %}">
+                {% csrf_token %}
+                {% if cart_return_url %}<input type="hidden" name="next" value="{{ cart_return_url }}">{% endif %}
+                <button class="danger" type="submit">删除</button>
+              </form>
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <div class="cart-summary">
+    {% if request.user.is_authenticated and total > 0 %}<span>合计：¥{{ total }}（含运费到付，最终金额以公司确认为准）</span>{% else %}<span>提交订单后由工作人员确认库存和交期</span>{% endif %}
+    <a class="primary-link" href="{% url 'orders:confirm' %}">提交订单</a>
+  </div>
+{% else %}
+  <p class="empty">购物车为空。</p>
+  <a class="primary-link" href="{% url 'catalog:product_list' %}">选择产品</a>
+{% endif %}

@@ -1,0 +1,25 @@
+<article class="product-image-card">
+  <a class="product-image-preview" href="{{ image.url }}" target="_blank" rel="noopener">
+    <img src="{{ image.url }}" alt="{{ image.name }}" loading="lazy">
+  </a>
+  <div class="product-image-meta">
+    <div class="product-image-name">{{ image.name }}</div>
+    {% if image.is_primary %}<div><span class="product-image-primary">当前产品主图</span></div>{% endif %}
+    <div class="product-image-actions">
+      {% if allow_primary and not image.is_primary %}
+        <form method="post">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="set_main">
+          <input type="hidden" name="image_path" value="{{ image.relative_path }}">
+          <button type="submit" class="button">设为主图</button>
+        </form>
+      {% endif %}
+      <form method="post" onsubmit="return confirm('确定删除这张图片吗？此操作无法撤销。');">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="delete">
+        <input type="hidden" name="image_path" value="{{ image.relative_path }}">
+        <button type="submit" class="product-image-delete">删除</button>
+      </form>
+    </div>
+  </div>
+</article>

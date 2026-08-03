@@ -1,0 +1,58 @@
+{% load catalog_extras %}
+{% load static %}
+{% with link_sku=product.hit_sku %}
+<article class="product-card">
+  <a class="product-image" href="{{ product.get_absolute_url }}{% if link_sku %}?sku={{ link_sku.id }}{% endif %}">
+    {% if product.brand %}<span class="product-brand-corner">{{ product.brand }}</span>{% endif %}
+    {% if not link_sku and product.peer_skus|length > 1 %}<span class="product-variant-badge">{{ product.peer_skus|length }} 个同类型产品</span>{% endif %}
+    <img src="{{ product.main_image_url|default:product.display_image_url }}" alt="{{ product.name }}" referrerpolicy="no-referrer">
+  </a>
+  <div class="product-body">
+    <a class="product-name" href="{{ product.get_absolute_url }}{% if link_sku %}?sku={{ link_sku.id }}{% endif %}">
+      {{ product.name }}{% if product.manufacturer_model %} {{ product.manufacturer_model }}{% endif %}{% if link_sku and link_sku.color %} {{ link_sku.color }}{% endif %}
+    </a>
+    {% with default_sku=link_sku|default:product.base_sku %}
+      {% if default_sku %}
+        {% if default_sku.internal_sku_code %}
+    <div class="card-sku-code">商品编码：{{ default_sku.internal_sku_code }}</div>
+        {% endif %}
+        <div class="card-specs-row">
+          {% if default_sku.capacity %}<span class="spec-tag"><img src="{% static 'img/icon.png' %}" alt="容量" class="spec-icon">{{ default_sku.capacity }}</span>{% endif %}
+          {% if default_sku.mpq %}<span class="spec-tag"><img src="{% static 'img/icon.png' %}" alt="容量" class="spec-icon">MPQ {{ default_sku.mpq|qty }}</span>{% endif %}
+        </div>
+      {% endif %}
+    {% endwith %}
+    {% with default_sku=link_sku|default:product.base_sku %}
+      {% if default_sku %}
+        {% if request.user.is_authenticated %}
+          <div class="card-price card-price--top">
+            {% if default_sku.list_price %}<span class="price-list">¥{{ default_sku.list_price }}</span>{% endif %}
+            {% if default_sku.price %}<span class="price">¥{{ default_sku.price }}</span>{% endif %}
+          </div>
+        {% else %}
+          <div class="card-price card-price--top"><span class="price-guest">会员可见价格</span></div>
+        {% endif %}
+      {% endif %}
+    {% endwith %}
+    {% with default_sku=link_sku|default:product.base_sku %}
+      {% if default_sku %}
+        {% if request.user.is_authenticated %}
+          <form class="card-quick-buy js-add-to-cart" action="{% url 'cart:add' default_sku.id %}" method="post" data-image-url="{{ product.main_image_url|default:product.display_image_url }}">
+            {% csrf_token %}
+            <input type="number" name="qty" value="{{ default_sku.moq|qty }}" min="{{ default_sku.moq|qty }}" step="{{ default_sku.order_step|qty }}" aria-label="数量">
+            {% if default_sku.can_add_to_cart %}
+              <button type="submit">加入购物车</button>
+            {% else %}
+              <button type="button" disabled>联系销售</button>
+            {% endif %}
+          </form>
+        {% else %}
+          <a class="card-quick-buy ghost-button" href="{% url 'accounts:login' %}?next={{ product.get_absolute_url|urlencode }}">登录后查看价格</a>
+        {% endif %}
+      {% else %}
+        <div class="card-quick-buy ghost-button"><button type="button" disabled>联系销售</button></div>
+      {% endif %}
+    {% endwith %}
+  </div>
+</article>
+{% endwith %}

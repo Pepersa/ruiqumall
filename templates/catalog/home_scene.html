@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}{{ scene.title }} - 场景推荐{% endblock %}
+
+{% block content %}
+<section class="home-scenes">
+  <div class="section-title">
+    <h2>场景推荐</h2>
+    <a class="section-title-link" href="{% url 'home' %}">‹ 返回首页</a>
+  </div>
+</section>
+
+<section class="scene-hero">
+  <div class="scene-hero-card">
+    {% if scene.banner_image %}
+      <div class="scene-hero-media">
+        <img src="{{ scene.banner_image.url }}" alt="{{ scene.title }}">
+      </div>
+    {% endif %}
+    <div class="scene-hero-body">
+      <h1 class="scene-hero-title">{{ scene.title }}</h1>
+      {% if scene.subtitle %}
+        <div class="scene-hero-sub">{{ scene.subtitle }}</div>
+      {% endif %}
+      {% if scene.description %}
+        <div class="scene-hero-divider"></div>
+        <div class="scene-hero-desc">{{ scene.description|linebreaksbr }}</div>
+      {% endif %}
+    </div>
+  </div>
+</section>
+
+<section class="scene-products">
+  <div class="scene-main-head">
+    <h2 class="scene-main-title">该场景下的精选商品</h2>
+    <span class="scene-main-meta">共 {{ scene_products|length }} 件</span>
+  </div>
+
+  {% if scene_products %}
+    <div class="product-grid">
+      {% for product in scene_products %}
+        {% include "catalog/partials/product_card.html" with product=product %}
+      {% endfor %}
+    </div>
+  {% else %}
+    <div class="empty-state">
+      <p>该场景暂未配置商品。</p>
+      <a class="ghost-button" href="{% url 'home' %}">返回首页</a>
+    </div>
+  {% endif %}
+</section>
+{% endblock %}

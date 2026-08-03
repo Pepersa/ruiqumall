@@ -1,0 +1,84 @@
+{% extends "admin/base_site.html" %}
+{% load i18n %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+  <a href="{% url 'admin:index' %}">{% translate 'Home' %}</a>
+  &rsaquo; <a href="{% url 'admin:app_list' app_label=opts.app_label %}">{{ opts.app_config.verbose_name }}</a>
+  &rsaquo; <a href="{% url 'admin:catalog_product_changelist' %}">{{ opts.verbose_name_plural|capfirst }}</a>
+  &rsaquo; 上架模板导入
+</div>
+{% endblock %}
+
+{% block content %}
+<div id="content-main">
+  <h1>上架模板导入</h1>
+
+  <div class="messagelist" style="margin:16px 0">
+    <div class="info" style="display:block">
+      <strong>说明：</strong>
+      该页面用于导入固定格式的上架模板 Excel（14 列）：
+      一级目录 / 二级目录 / 三级目录 / 商品编码 / 品牌 / 产品名称 /
+      制造商型号 / 容量 / 颜色 / 含税价 / 销售单位 / 包规 / MOQ / MPQ。
+      <br>
+      系统会按
+      <strong>品牌 + 产品名称 + 制造商型号</strong>
+      去重：相同的三字段视为同一产品系列，自动归到同一 Product 下；
+      商品编码不同则作为该系列下的不同 SKU。
+      <br>
+      Product.style_code 由"品牌-产品名-型号"自动拼接生成；
+      分类按 一级/二级/三级 自动创建（若已存在则复用）。
+    </div>
+  </div>
+
+  <fieldset class="module aligned">
+    <h2>模板字段对照</h2>
+    <div class="description" style="padding:16px;line-height:1.8">
+      <table style="width:auto;margin:8px 0;border-collapse:collapse">
+        <thead>
+          <tr style="background:#f5f5f5">
+            <th style="border:1px solid #ddd;padding:6px 12px">Excel 列</th>
+            <th style="border:1px solid #ddd;padding:6px 12px">写入字段</th>
+            <th style="border:1px solid #ddd;padding:6px 12px">说明</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td style="border:1px solid #ddd;padding:6px 12px">一级目录</td><td style="border:1px solid #ddd;padding:6px 12px">Product.category</td><td style="border:1px solid #ddd;padding:6px 12px">顶级分类</td></tr>
+          <tr><td style="border:1px solid #ddd;padding:6px 12px">二级目录 / 三级目录</td><td style="border:1px solid #ddd;padding:6px 12px">Product.category</td><td style="border:1px solid #ddd;padding:6px 12px">子分类</td></tr>
+          <tr><td style="border:1px solid #ddd;padding:6px 12px">商品编码</td><td style="border:1px solid #ddd;padding:6px 12px">SKU.internal_sku_code</td><td style="border:1px solid #ddd;padding:6px 12px">SKU 唯一键</td></tr>
+          <tr><td style="border:1px solid #ddd;padding:6px 12px">品牌</td><td style="border:1px solid #ddd;padding:6px 12px">Product.brand</td><td style="border:1px solid #ddd;padding:6px 12px">品牌</td></tr>
+          <tr><td style="border:1px solid #ddd;padding:6px 12px">产品名称</td><td style="border:1px solid #ddd;padding:6px 12px">Product.name</td><td style="border:1px solid #ddd;padding:6px 12px">系列名称</td></tr>
+          <tr><td style="border:1px solid #ddd;padding:6px 12px">制造商型号</td><td style="border:1px solid #ddd;padding:6px 12px">Product.manufacturer_model</td><td style="border:1px solid #ddd;padding:6px 12px">厂商型号</td></tr>
+          <tr><td style="border:1px solid #ddd;padding:6px 12px">容量</td><td style="border:1px solid #ddd;padding:6px 12px">Product.capacity</td><td style="border:1px solid #ddd;padding:6px 12px">通用容量规格</td></tr>
+          <tr><td style="border:1px solid #ddd;padding:6px 12px">颜色</td><td style="border:1px solid #ddd;padding:6px 12px">SKU.color</td><td style="border:1px solid #ddd;padding:6px 12px">SKU 颜色</td></tr>
+          <tr><td style="border:1px solid #ddd;padding:6px 12px">含税价</td><td style="border:1px solid #ddd;padding:6px 12px">SKU.price</td><td style="border:1px solid #ddd;padding:6px 12px">含税单价</td></tr>
+          <tr><td style="border:1px solid #ddd;padding:6px 12px">销售单位</td><td style="border:1px solid #ddd;padding:6px 12px">SKU.unit</td><td style="border:1px solid #ddd;padding:6px 12px">桶 / 瓶 …</td></tr>
+          <tr><td style="border:1px solid #ddd;padding:6px 12px">包规</td><td style="border:1px solid #ddd;padding:6px 12px">SKU.package_spec</td><td style="border:1px solid #ddd;padding:6px 12px">如 12瓶/箱</td></tr>
+          <tr><td style="border:1px solid #ddd;padding:6px 12px">MOQ</td><td style="border:1px solid #ddd;padding:6px 12px">SKU.moq</td><td style="border:1px solid #ddd;padding:6px 12px">起订量</td></tr>
+          <tr><td style="border:1px solid #ddd;padding:6px 12px">MPQ</td><td style="border:1px solid #ddd;padding:6px 12px">SKU.mpq</td><td style="border:1px solid #ddd;padding:6px 12px">每包数量 / 销售步进</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </fieldset>
+
+  <form method="post" enctype="multipart/form-data" style="margin-top:20px">
+    {% csrf_token %}
+    <fieldset class="module aligned">
+      <div class="form-row">
+        <label class="required" for="id_import_file">Excel 文件：</label>
+        <input type="file" name="import_file" id="id_import_file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" required>
+      </div>
+      <div class="form-row">
+        <label for="id_dry_run">
+          <input type="checkbox" name="dry_run" id="id_dry_run">
+          仅校验，不写入（推荐第一次导入时打开）
+        </label>
+      </div>
+    </fieldset>
+    <div class="submit-row">
+      <input type="submit" value="开始导入" class="default">
+      <a href="{% url 'admin:catalog_product_changelist' %}" class="button cancel-link">取消</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

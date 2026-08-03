@@ -1,0 +1,330 @@
+{% extends "base.html" %}
+{% load static catalog_extras %}
+{% block title %}{{ product.name }}{% for item in selected_name_attributes %} {{ item.value }}{% endfor %}{% endblock %}
+{% block content %}
+<section class="detail-layout product-hero">
+  <div class="detail-media">
+    <div class="breadcrumb product-gallery-breadcrumb">
+      {% if breadcrumbs %}
+        {% for category in breadcrumbs %}
+          <a href="{% url 'catalog:product_list' %}?category={{ category.slug }}">{{ category.name }}</a>{% if not forloop.last %} / {% endif %}
+        {% endfor %}
+      {% else %}
+        未分类
+      {% endif %}
+      {% if product.brand %} / {{ product.brand }}{% endif %}
+    </div>
+  <div class="product-gallery-card">
+    {% if product_gallery_images %}
+    <div class="product-gallery-stage" id="gallery-stage">
+      <span class="product-gallery-badge">产品图</span>
+      <img
+        id="gallery-main-img"
+        src="{{ product_gallery_images.0.url }}"
+        alt="{{ product.name }}"
+        referrerpolicy="no-referrer"
+        style="height:360px"
+      >
+    </div>
+    {% if product_gallery_images|length > 1 %}
+    <div class="gallery-thumbnails" id="gallery-thumbs">
+      {% for img in product_gallery_images %}
+        <button
+          class="gallery-thumb {% if forloop.first %}is-active{% endif %}"
+          type="button"
+          data-gallery-src="{{ img.url }}"
+          aria-label="查看第 {{ forloop.counter }} 张图片"
+        >
+          <img src="{{ img.url }}" alt="{{ img.alt }}" loading="lazy">
+        </button>
+      {% endfor %}
+    </div>
+    {% endif %}
+    {% else %}
+    <div class="product-gallery-stage">
+      <span class="product-gallery-badge">产品图</span>
+      <img src="{{ product_main_image_url }}" alt="{{ product.name }}" referrerpolicy="no-referrer" style="height:360px">
+    </div>
+    {% endif %}
+    <div class="product-gallery-foot">
+      <span>图片仅供产品识别，包装以实物为准</span>
+    </div>
+    </div>
+  </div>
+  <div class="detail-main">
+    <h1 class="product-detail-title">
+      {{ product.name }}{% for item in selected_name_attributes %} <span>{{ item.value }}</span>{% endfor %}{% for extra in title_extras %} <span>{{ extra }}</span>{% endfor %}
+    </h1>
+    {% if request.user.is_authenticated and selected_sku %}
+      {% with tax_price=selected_sku.price %}
+        {% if tax_price and selected_sku.unit %}
+          <div class="product-tax-price">含税价：<span class="tax-price-value">¥{{ tax_price }}</span>/{{ selected_sku.unit }}</div>
+        {% endif %}
+      {% endwith %}
+    {% endif %}
+    {% if product.alias %}<p class="lead">{{ product.name }}</p>{% endif %}
+    <div class="product-service-strip" aria-label="采购服务">
+      <span>正品货源</span>
+      <span>企业采购</span>
+      <span>库存交期确认</span>
+    </div>
+
+    {% if skus %}
+      <div class="buy-box">
+        <div class="sku-panel">
+          {% if product.brand %}<div class="sku-category-attribute"><span>品牌：</span><span>{{ product.brand }}</span></div>{% endif %}
+          {% if selected_sku.internal_sku_code %}<div class="sku-category-attribute"><span>订货编码：</span><span class="sku-code-highlight">{{ selected_sku.internal_sku_code }}</span></div>{% endif %}
+          {% if product.manufacturer_model %}<div class="sku-category-attribute"><span>制造商型号：</span><span>{{ product.manufacturer_model }}</span></div>{% endif %}
+          {% if selected_sku.capacity %}<div class="sku-category-attribute"><span>容量：</span><span>{{ selected_sku.capacity }}</span></div>{% endif %}          {% if selected_sku.color %}<div class="sku-category-attribute"><span>颜色：</span><span>{{ selected_sku.color }}</span></div>{% endif %}
+          {% if selected_sku.unit %}<div class="sku-category-attribute"><span>销售单位：</span><span>{{ selected_sku.unit }}</span></div>{% endif %}
+          {% if selected_sku.package_spec %}<div class="sku-category-attribute"><span>包规：</span><span>{{ selected_sku.package_spec }}</span></div>{% endif %}
+          {% if selected_sku.mpq %}<div class="sku-category-attribute"><span>MPQ：</span><span>{{ selected_sku.mpq|qty }}</span></div>{% endif %}
+          {% for attribute in detail_attributes %}
+            {% with value=selected_sku.attributes|get_item:attribute.code %}
+              {% if value %}
+                <div class="sku-category-attribute"><span>{{ attribute.name }}：</span><span>{{ value }}</span></div>
+              {% endif %}
+            {% endwith %}
+          {% endfor %}
+        </div>
+        {% if request.user.is_authenticated %}
+          <form class="buy-actions js-add-to-cart" action="{% url 'cart:add' selected_sku.id %}" method="post" data-image-url="{{ product_gallery_images.0.url|default:product_main_image_url }}">
+            {% csrf_token %}
+            <div class="quantity-stepper" aria-label="选择购买数量">
+              <button type="button" class="quantity-step-button" data-quantity-change="-1" aria-label="减少数量">&minus;</button>
+              <input type="number" step="{{ selected_sku.order_step|qty }}" min="{{ selected_sku.moq|qty }}" name="qty" value="{{ selected_sku.moq|qty }}" aria-label="购买数量">
+              <button type="button" class="quantity-step-button" data-quantity-change="1" aria-label="增加数量">+</button>
+            </div>
+            {% if selected_sku.can_add_to_cart %}
+              <button type="submit" class="buy-actions-submit">加入购物车</button>
+            {% else %}
+              <button type="button" class="buy-actions-submit" disabled>联系销售确认</button>
+            {% endif %}
+          </form>
+        {% else %}
+          <div class="buy-actions">
+            <span class="login-gate-hint">登录后查看价格并下单</span>
+            <a href="{% url 'accounts:login' %}?next={{ request.path|urlencode }}" class="buy-actions-submit">登录 / 注册</a>
+          </div>
+        {% endif %}
+      </div>
+    {% else %}
+      <p class="empty">暂无可售 SKU。</p>
+    {% endif %}
+  </div>
+</section>
+
+{% if variant_skus %}
+<section class="content-band variant-section">
+  <div class="section-title variant-section-title">
+    <div>
+      <h2>其他所有型号</h2>
+      <p>该系列产品系列下的全部可售具体型号</p>
+    </div>
+    <span class="variant-result-count">共 {{ variant_paginator.count }} 个型号</span>
+  </div>
+  <div class="variant-browser">
+    <form class="variant-filters" method="get" action="{{ product.get_absolute_url }}#all-models" data-variant-filter-form>
+      {% if variant_query %}<input type="hidden" name="variant_q" value="{{ variant_query }}">{% endif %}
+      <div class="variant-filter-head">
+        <strong>产品选项</strong>
+        {% if variant_filter_groups %}<a href="{{ product.get_absolute_url }}" data-clear-variant-filters>清空筛选</a>{% endif %}
+      </div>
+      <div class="filter-panels">
+        {% if variant_filter_groups %}
+          {% for group in variant_filter_groups %}
+            {% if group.attribute.code in 'volume,color' %}
+            {% with count=group.values|length %}
+            <div class="filter-panel"
+                 data-filter-panel
+                 data-total="{{ count }}">
+              <div class="filter-panel-header" data-filter-toggle>
+                <span class="filter-panel-title">{{ group.attribute.name }}</span>
+                {% if count > 0 %}
+                <span class="filter-panel-meta">{{ count }} 项</span>
+                {% endif %}
+                <svg class="filter-panel-arrow" width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M3 5L7 9L11 5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              </div>
+              <div class="filter-panel-body" data-panel-body>
+                <div class="filter-options-list">
+                  {% for value in group.values %}
+                    <label class="filter-chip" data-chip>
+                      <input type="checkbox" name="{{ group.param }}" value="{{ value }}" {% if value in group.selected_values %}checked{% endif %}>
+                      <span class="filter-chip-check"></span>
+                      <span>{{ value }}</span>
+                    </label>
+                  {% endfor %}
+                </div>
+              </div>
+            </div>
+            {% endwith %}
+            {% endif %}
+          {% endfor %}
+        {% else %}
+          <p class="empty">该系列暂无可筛选属性，请使用下方搜索框查找型号。</p>
+        {% endif %}
+      </div>
+    </form>
+
+    <div class="variant-results" id="all-models">
+      <form class="variant-search" method="get" action="{{ product.get_absolute_url }}#all-models">
+        {% if selected_sku %}<input type="hidden" name="sku" value="{{ selected_sku.pk }}">{% endif %}
+        {% if variant_filter_groups %}
+          {% for group in variant_filter_groups %}
+            {% for value in group.selected_values %}
+              <input type="hidden" name="{{ group.param }}" value="{{ value }}">
+            {% endfor %}
+          {% endfor %}
+        {% endif %}
+        <input type="search" name="variant_q" value="{{ variant_query }}" placeholder="请输入产品名称、品牌、型号或订货编码" aria-label="搜索系列型号">
+        <button type="submit">查询</button>
+      </form>
+      <div class="variant-list-region">
+        <div class="variant-list" id="variant-list">
+          {% for sku in variant_skus %}
+          <article class="variant-row">
+            <div class="variant-row-info" data-info>
+              <div class="variant-row-info-top">
+                {% with other_label=sku.product.manufacturer_model %}
+                <a href="{{ product.get_absolute_url }}?sku={{ sku.id }}"><strong>{% if other_label %}{{ sku.product.brand }} {{ sku.product.name }} {{ other_label }}{% if sku.color %} {{ sku.color }}{% endif %}{% if sku.capacity %} {{ sku.capacity }}{% endif %}{% else %}{{ sku.product.name }}{% endif %}</strong></a>
+                <span>订货编码：{{ sku.internal_sku_code }}</span>
+                {% if sku.color_code %}<span class="color-code-tag">色号 {{ sku.color_code }}</span>{% endif %}
+                {% endwith %}
+              </div>
+              <dl class="variant-row-attrs" data-attrs>
+                {% if 'manufacturer_model' in variant_row_attribute_keys and sku.product.manufacturer_model %}<div data-attr><dt>制造商型号：</dt><dd>{{ sku.product.manufacturer_model }}</dd></div>{% endif %}
+                {% if 'capacity' in variant_row_attribute_keys and sku.capacity %}<div data-attr><dt>容量：</dt><dd>{{ sku.capacity }}</dd></div>{% endif %}
+                {% if 'unit' in variant_row_attribute_keys and sku.unit %}<div data-attr><dt>销售单位：</dt><dd>{{ sku.unit }}</dd></div>{% endif %}
+                {% if 'package_spec' in variant_row_attribute_keys and sku.package_spec %}<div data-attr><dt>包规：</dt><dd>{{ sku.package_spec }}</dd></div>{% endif %}
+                {% if 'mpq' in variant_row_attribute_keys and sku.mpq %}<div data-attr><dt>MPQ：</dt><dd>{{ sku.mpq|qty }}</dd></div>{% endif %}
+                {% for attribute in detail_attributes %}
+                  {% if attribute.code in variant_row_attribute_keys %}
+                    {% with value=sku.attributes|get_item:attribute.code %}
+                      {% if value %}<div data-attr><dt>{{ attribute.name }}：</dt><dd>{{ value }}</dd></div>{% endif %}
+                    {% endwith %}
+                  {% endif %}
+                {% endfor %}
+              </dl>
+            </div>
+            <div class="variant-row-price">
+              {% if request.user.is_authenticated %}
+                {% if sku.list_price %}<span class="price-list">¥{{ sku.list_price }}</span>{% endif %}
+                {% if sku.price %}<strong>¥{{ sku.price }}</strong>{% endif %}
+              {% else %}
+                <span class="price-guest">登录后查看价格</span>
+              {% endif %}
+            </div>
+            {% if request.user.is_authenticated %}
+            <form class="variant-buy js-add-to-cart" action="{% url 'cart:add' sku.id %}" method="post" data-image-url="{{ product_gallery_images.0.url|default:product_main_image_url }}">
+              {% csrf_token %}
+              <div class="quantity-stepper quantity-stepper--compact" aria-label="选择{{ sku.display_name }}购买数量">
+                <button type="button" class="quantity-step-button" data-quantity-change="-1" aria-label="减少数量">&minus;</button>
+                <input type="number" name="qty" value="{{ sku.moq|qty }}" min="{{ sku.moq|qty }}" step="{{ sku.order_step|qty }}" aria-label="{{ sku.display_name }}数量">
+                <button type="button" class="quantity-step-button" data-quantity-change="1" aria-label="增加数量">+</button>
+              </div>
+              {% if sku.can_add_to_cart %}<button type="submit">加入购物车</button>{% else %}<button type="button" disabled>联系销售</button>{% endif %}
+            </form>
+            {% else %}
+            <a class="variant-buy" href="{% url 'accounts:login' %}?next={{ request.path|urlencode }}">
+              <button type="button">登录后查看</button>
+            </a>
+            {% endif %}
+          </article>
+          {% empty %}
+            <p class="empty variant-empty">没有找到匹配型号，请调整筛选条件。</p>
+          {% endfor %}
+        </div>
+        {% if variant_paginator.num_pages > 1 %}
+          <nav class="pagination-bar variant-pagination" aria-label="系列型号分页">
+            <div class="pagination-total">共 {{ variant_paginator.count }} 条</div>
+            <div class="pagination-pages">
+              {% if variant_page_obj.has_previous %}
+                <a class="page-button" href="?{% if variant_page_querystring %}{{ variant_page_querystring }}&{% endif %}variant_page={{ variant_page_obj.previous_page_number }}" aria-label="上一页">&lt;</a>
+              {% else %}
+                <span class="page-button disabled" aria-disabled="true">&lt;</span>
+              {% endif %}
+              {% for item in variant_page_items %}
+                {% if item == 'ellipsis' or item == 'ellipsis-left' or item == 'ellipsis-right' %}
+                  <span class="page-ellipsis">...</span>
+                {% elif item == variant_page_obj.number %}
+                  <span class="page-button active" aria-current="page">{{ item }}</span>
+                {% else %}
+                  <a class="page-button" href="?{% if variant_page_querystring %}{{ variant_page_querystring }}&{% endif %}variant_page={{ item }}">{{ item }}</a>
+                {% endif %}
+              {% endfor %}
+              {% if variant_page_obj.has_next %}
+                <a class="page-button" href="?{% if variant_page_querystring %}{{ variant_page_querystring }}&{% endif %}variant_page={{ variant_page_obj.next_page_number }}" aria-label="下一页">&gt;</a>
+              {% else %}
+                <span class="page-button disabled" aria-disabled="true">&gt;</span>
+              {% endif %}
+            </div>
+            <form class="pagination-jump" data-variant-jump>
+              <input id="jump-page" type="number" name="page" min="1" max="{{ variant_paginator.num_pages }}" value="{{ variant_page_obj.number }}" aria-label="跳转到页码">
+              <button type="submit">确定</button>
+            </form>
+          </nav>
+        {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+{% endif %}
+
+{% if product_gallery_images %}
+<section class="content-band product-detail-gallery" id="product-details">
+  <div class="section-title product-detail-gallery-title">
+    <div>
+      <span class="section-kicker">PRODUCT DETAILS</span>
+      <h2>产品详情</h2>
+      <p>产品包装、特性与使用信息</p>
+    </div>
+    <span>{{ product_gallery_images|length }} 张图片</span>
+  </div>
+  <div class="product-detail-image-list">
+    {% for image in product_gallery_images %}
+      <button
+        class="product-detail-image"
+        type="button"
+        data-detail-image-open
+        data-image-url="{{ image.url }}"
+        aria-label="放大查看第 {{ forloop.counter }} 张产品详情图"
+      >
+        <img src="{{ image.url }}" alt="{{ image.alt }}" loading="lazy">
+      </button>
+    {% endfor %}
+  </div>
+</section>
+
+<dialog class="product-image-lightbox" data-detail-image-dialog aria-label="产品详情大图">
+  <button type="button" class="product-image-lightbox-close" data-detail-image-close aria-label="关闭大图">&times;</button>
+  <img src="" alt="{{ product.name }} 产品详情大图" data-detail-image-preview>
+</dialog>
+{% endif %}
+
+{% if product_documents %}
+<section class="content-band product-documents">
+  <div class="section-title">
+    <div>
+      <span class="section-kicker">DOWNLOADS</span>
+      <h2>商品说明</h2>
+    </div>
+  </div>
+  <div class="document-list">
+    {% for doc in product_documents %}
+      <a class="document-item" href="{{ doc.file.url }}" download="{{ doc.title }}">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+          <polyline points="14 2 14 8 20 8"/>
+        </svg>
+        <span>{{ doc.title }}</span>
+      </a>
+    {% endfor %}
+  </div>
+</section>
+{% endif %}
+{% endblock %}
+{% block extra_js %}
+<script src="{% get_static_prefix %}js/product-variants.js"></script>
+<script src="{% get_static_prefix %}js/product-gallery.js?v=20260723-product-gallery"></script>
+{% endblock %}

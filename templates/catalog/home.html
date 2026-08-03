@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}锐取科技化学品采购{% endblock %}
+{% block content %}
+{% if home_scenes %}
+<section class="home-scenes">
+  <div class="section-title">
+    <h2>场景推荐</h2>
+    <a class="section-title-link" href="#categories">查看全部分类</a>
+  </div>
+  <div class="scene-tile-grid">
+    {% for scene in home_scenes %}
+      <a class="scene-tile" href="{% url 'home_scene' scene.slug %}">
+        <div class="scene-tile-media">
+          {% if scene.banner_image %}
+            <img src="{{ scene.banner_image.url }}" alt="{{ scene.title }}">
+          {% else %}
+            <img src="{% static 'img/chemical-placeholder.png' %}" alt="{{ scene.title }}">
+          {% endif %}
+          <div class="scene-tile-overlay">
+            <div class="scene-tile-title">{{ scene.title }}</div>
+            {% if scene.subtitle %}
+              <div class="scene-tile-sub">{{ scene.subtitle }}</div>
+            {% endif %}
+            <div class="scene-tile-cta">立即查看 ›</div>
+          </div>
+        </div>
+      </a>
+    {% endfor %}
+  </div>
+</section>
+{% else %}
+<section class="home-top">
+  <div class="hero">
+    <div>
+      <h1>化学品展示与企业下单</h1>
+      <p>按产品、品牌、规格和 SKU 快速检索，提交后由公司确认库存与交期。</p>
+    </div>
+    <img src="{% static 'img/chemical-hero.png' %}" alt="化学品包装与实验器具">
+  </div>
+</section>
+{% endif %}
+
+<section class="content-band" id="categories">
+  <div class="section-title">
+    <h2>产品分类</h2>
+  </div>
+  <div class="cat-tile-grid">
+    {% for entry in home_categories %}
+      <a class="cat-tile" href="{{ entry.resolved_url }}">
+        <span class="cat-tile-media">
+          {% if entry.image %}
+            <img src="{{ entry.image.url }}" alt="{{ entry.display_title }}">
+          {% else %}
+            <img src="{% static 'img/chemical-placeholder.png' %}" alt="{{ entry.display_title }}">
+          {% endif %}
+        </span>
+        <span class="cat-tile-name">{{ entry.display_title }}</span>
+      </a>
+    {% empty %}
+      <p class="empty">暂无分类。</p>
+    {% endfor %}
+  </div>
+</section>
+{% endblock %}

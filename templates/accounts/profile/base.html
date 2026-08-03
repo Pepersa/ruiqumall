@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="profile-layout">
+  <aside class="profile-nav">
+    <div class="profile-nav-head">
+      <strong>{{ profile_user.profile.name|default:profile_user.username }}</strong>
+      <span>{{ profile_user.email|default:"未填写邮箱" }}</span>
+    </div>
+    <nav aria-label="个人中心导航">
+      <a class="{% if profile_section == 'home' %}active{% endif %}" href="{% url 'accounts:profile' %}">概览</a>
+      <a class="{% if profile_section == 'cart' %}active{% endif %}" href="{% url 'accounts:profile_cart' %}">购物车</a>
+      <a class="{% if profile_section == 'orders' %}active{% endif %}" href="{% url 'accounts:profile_orders' %}">我的订单</a>
+      <a class="{% if profile_section == 'edit' %}active{% endif %}" href="{% url 'accounts:profile_edit' %}">个人信息</a>
+      <a class="{% if profile_section == 'addresses' %}active{% endif %}" href="{% url 'accounts:profile_addresses' %}">收货地址</a>
+    </nav>
+  </aside>
+  <section class="profile-content">
+    {% block profile_content %}{% endblock %}
+  </section>
+</div>
+{% endblock %}

@@ -1,0 +1,41 @@
+<nav class="cat-flyout-nav" aria-label="全部商品分类">
+  <a class="cat-flyout-nav-head" href="{% url 'catalog:product_list' %}" aria-haspopup="true">
+    <span>全部商品分类</span>
+    <span class="cat-flyout-trigger-caret" aria-hidden="true"></span>
+  </a>
+  <ul class="cat-flyout-list" aria-label="商品分类列表">
+    {% for root in category_tree %}
+      {% with root_children=root.children.all %}
+        <li class="cat-flyout-item">
+          <a class="cat-flyout-link" href="{% url 'catalog:product_list' %}?category={{ root.slug }}">
+            <span class="cat-flyout-dot"></span>
+            <span>{{ root.name }}</span>
+            {% if root_children %}<span class="cat-flyout-caret">&rsaquo;</span>{% endif %}
+          </a>
+          {% if root_children %}
+            <div class="cat-flyout-panel">
+              <div class="cat-flyout-panel-inner">
+                {% for second in root_children %}
+                  {% if second.is_active %}
+                    <div class="cat-flyout-group">
+                      <a class="cat-flyout-group-title" href="{% url 'catalog:product_list' %}?category={{ second.slug }}">{{ second.name }}</a>
+                      <div class="cat-flyout-tags">
+                        {% for third in second.children.all %}
+                          {% if third.is_active %}
+                            <a href="{% url 'catalog:product_list' %}?category={{ third.slug }}">{{ third.name }}</a>
+                          {% endif %}
+                        {% endfor %}
+                      </div>
+                    </div>
+                  {% endif %}
+                {% endfor %}
+              </div>
+            </div>
+          {% endif %}
+        </li>
+      {% endwith %}
+    {% empty %}
+      <li class="empty">暂无分类。</li>
+    {% endfor %}
+  </ul>
+</nav>

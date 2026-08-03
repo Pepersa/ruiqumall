@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block title %}注册申请已提交{% endblock %}
+{% block content %}
+<section class="auth-panel" style="text-align:center">
+  <h1>注册申请已提交</h1>
+  <div style="margin:24px 0;padding:24px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:12px">
+    <div style="font-size:48px;margin-bottom:12px">⏳</div>
+    <p style="font-size:16px;color:#166534;margin:0 0 12px">
+      您的注册申请已提交，正在等待管理员审核。
+    </p>
+    <p style="color:#15803d;font-size:14px;margin:0">
+      审核结果将以短信或电话通知，请保持电话畅通。<br>
+      如需加急，请直接联系客服。
+    </p>
+  </div>
+  <p><a href="{% url 'home' %}">返回首页</a>　　<a href="{% url 'accounts:login' %}">去登录</a></p>
+</section>
+{% endblock %}

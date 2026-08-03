@@ -1,0 +1,38 @@
+{% extends "admin/base_site.html" %}
+{% load i18n %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+  <a href="{% url 'admin:index' %}">{% translate 'Home' %}</a>
+  &rsaquo; <a href="{% url 'admin:app_list' app_label=opts.app_label %}">{{ opts.app_config.verbose_name }}</a>
+  &rsaquo; <a href="{% url 'admin:catalog_customerskuprice_changelist' %}">{{ opts.verbose_name_plural|capfirst }}</a>
+  &rsaquo; 导入协议价
+</div>
+{% endblock %}
+
+{% block content %}
+<div id="content-main">
+  <h1>批量导入客户协议价</h1>
+  <p>请上传 Excel 文件，工作表名称必须为 <strong>客户协议价</strong>。每行代表一条 <code>客户 × SKU × 阶梯</code> 协议价。必填列：<strong>公司名称</strong>、<strong>内部 SKU 编码</strong>、<strong>协议价</strong>。建议先导出当前协议价作为模板。</p>
+  <p>起订量/封顶量、生效开始/生效结束可留空；「启用」列填 <code>启用</code> 或 <code>停用</code>，默认启用。同一客户同一 SKU 同一阶梯已有记录时会被更新，并自动写入 <strong>协议价变更记录</strong>。</p>
+  <form method="post" enctype="multipart/form-data">
+    {% csrf_token %}
+    <fieldset class="module aligned">
+      <div class="form-row">
+        <label for="id_import_file">Excel 文件</label>
+        <input type="file" name="import_file" id="id_import_file" accept=".xlsx" required>
+      </div>
+      <div class="form-row">
+        <label for="id_dry_run">
+          <input type="checkbox" name="dry_run" id="id_dry_run">
+          仅校验，不写入数据库
+        </label>
+      </div>
+    </fieldset>
+    <div class="submit-row">
+      <input type="submit" value="开始导入" class="default">
+      <a href="{% url 'admin:catalog_customerskuprice_changelist' %}" class="button cancel-link">返回列表</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

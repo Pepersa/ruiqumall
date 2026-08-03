@@ -1,0 +1,57 @@
+{% extends "accounts/profile/base.html" %}
+{% block title %}个人中心{% endblock %}
+{% block profile_content %}
+<section class="page-head">
+  <h1>个人中心</h1>
+  <p>查看购物车、订单，并维护个人信息与收货地址。</p>
+</section>
+
+<div class="profile-cards">
+  <article class="profile-card">
+    <h2>购物车</h2>
+    <p>{{ cart_count }} 件商品</p>
+    <a href="{% url 'accounts:profile_cart' %}">查看购物车</a>
+  </article>
+  <article class="profile-card">
+    <h2>我的订单</h2>
+    <p>{{ order_count }} 笔订单</p>
+    <a href="{% url 'accounts:profile_orders' %}">查看全部订单</a>
+  </article>
+  <article class="profile-card">
+    <h2>收货地址</h2>
+    <p>{{ address_count }} 个地址</p>
+    <a href="{% url 'accounts:profile_addresses' %}">管理地址</a>
+  </article>
+  <article class="profile-card">
+    <h2>个人信息</h2>
+    <p>{{ profile_user.profile.name|default:profile_user.username }}</p>
+    <a href="{% url 'accounts:profile_edit' %}">编辑资料</a>
+  </article>
+</div>
+
+{% if recent_orders %}
+  <section class="profile-section">
+    <div class="section-title">
+      <h2>最近订单</h2>
+      <a href="{% url 'accounts:profile_orders' %}">查看全部</a>
+    </div>
+    <div class="table-wrap">
+      <table class="data-table">
+        <thead>
+          <tr><th>订单号</th><th>状态</th><th>下单时间</th><th></th></tr>
+        </thead>
+        <tbody>
+          {% for order in recent_orders %}
+            <tr>
+              <td>{{ order.order_no }}</td>
+              <td>{{ order.get_status_display }}</td>
+              <td>{{ order.created_at|date:"Y-m-d H:i" }}</td>
+              <td><a href="{{ order.get_absolute_url }}">详情</a></td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+{% endif %}
+{% endblock %}

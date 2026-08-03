@@ -1,0 +1,60 @@
+{% load static catalog_extras %}
+<!doctype html>
+<html lang="zh-Hans">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}锐取科技化学品采购{% endblock %}</title>
+  <link rel="stylesheet" href="{% static 'css/site.css' %}?v=20260723-product-gallery">
+</head>
+<body>
+  <header class="site-header">
+    <a class="brand" href="{% url 'home' %}" aria-label="锐取科技首页">
+      <img class="brand-logo" src="{% static 'img/ruiqu-logo.png' %}" alt="锐取科技">
+    </a>
+    <div class="header-search">
+      {% include "catalog/partials/category_flyout_nav.html" %}
+      <form class="top-search" action="{% url 'catalog:product_list' %}" method="get">
+        <input name="q" value="{{ request.GET.q }}" placeholder="搜索产品名、SKU、CAS、品牌、规格" aria-label="搜索商品">
+        <button type="submit" aria-label="搜索">搜索</button>
+      </form>
+    </div>
+    <nav class="top-nav">
+      <a href="{% url 'cart:detail' %}" id="cart-nav-link" class="cart-nav-link">
+        购物车
+        {% if cart_has_items %}<span class="cart-badge">{{ cart_item_count|qty }}</span>{% endif %}
+      </a>
+      {% if request.user.is_authenticated %}
+        <a href="{% url 'accounts:profile' %}">个人中心</a>
+        <form class="logout-form" method="post" action="{% url 'accounts:logout' %}">
+          {% csrf_token %}
+          <button type="submit">退出</button>
+        </form>
+      {% else %}
+        <a href="{% url 'accounts:register' %}">注册</a>
+        <a href="{% url 'accounts:login' %}">登录</a>
+      {% endif %}
+    </nav>
+  </header>
+
+  {% if messages %}
+    <div class="messages">
+      {% for message in messages %}
+        <div class="message {{ message.tags }}">{{ message }}</div>
+      {% endfor %}
+    </div>
+  {% endif %}
+
+  <main>
+    {% block content %}{% endblock %}
+  </main>
+
+  <footer class="site-footer">
+    <span>电话：待配置</span>
+    <span>邮箱：sales@example.com</span>
+    <span>工作日内确认库存和交期</span>
+  </footer>
+  {% block extra_js %}{% endblock %}
+  <script src="{% static 'js/cart-add.js' %}?t={% now 'YmdHis' %}"></script>
+</body>
+</html>

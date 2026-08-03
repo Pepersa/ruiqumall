@@ -1,0 +1,21 @@
+{% extends "admin/change_list.html" %}
+{% load i18n admin_urls %}
+
+{% block object-tools-items %}
+  {{ block.super }}
+  <li>
+    <a href="{% url 'admin:catalog_product_export_all' %}" class="addlink">导出全部产品</a>
+  </li>
+  <li>
+    <a href="{% url 'admin:catalog_product_import' %}" class="addlink">导入产品</a>
+  </li>
+  <li>
+    <a href="{% url 'admin:catalog_product_listing_import' %}" class="addlink">上架模板导入（Excel）</a>
+  </li>
+  <li>
+    <a href="{% url 'admin:catalog_product_listing_images' %}" class="addlink">上架模板图片上传（ZIP）</a>
+  </li>
+  <li>
+    <a href="{% url 'admin:catalog_product_bulk_images' %}" class="addlink">批量上传产品图片</a>
+  </li>
+{% endblock %}

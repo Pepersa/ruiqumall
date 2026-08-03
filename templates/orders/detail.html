@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% load catalog_extras %}
+{% block title %}订单 {{ order.order_no }}{% endblock %}
+{% block content %}
+<section class="page-head">
+  <h1>订单 {{ order.order_no }}</h1>
+  <p>状态：{{ order.get_status_display }}</p>
+</section>
+
+{% if verified %}
+  <section class="order-detail">
+    <div class="status-panel">
+      <span>采购企业：{{ order.customer.company_name }}</span>
+      <span>联系人：{{ order.customer.contact_name }}</span>
+      <span>收货人：{{ order.receiver_name }} {{ order.receiver_mobile }}</span>
+      <span>地址：{{ order.receiver_state }}{{ order.receiver_city }}{{ order.receiver_district }}{{ order.receiver_address }}</span>
+    </div>
+    <div class="table-wrap">
+      <table class="data-table">
+        <thead><tr><th>SKU</th><th>产品</th><th>属性</th><th>数量</th></tr></thead>
+        <tbody>
+          {% for item in order.items.all %}
+            <tr>
+              <td>{{ item.snapshot_sku_code }}</td>
+              <td>{{ item.snapshot_product_name }}</td>
+              <td>{{ item.properties_value }}</td>
+              <td>{{ item.qty|qty }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+{% else %}
+  <form class="verify-form" method="get">
+    <label>输入收件电话查看订单详情<input name="mobile" value="{{ mobile }}"></label>
+    <button type="submit">查看</button>
+  </form>
+{% endif %}
+{% endblock %}
