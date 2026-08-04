@@ -13,7 +13,7 @@ services:
       DJANGO_SESSION_COOKIE_SECURE: "${DJANGO_SESSION_COOKIE_SECURE:-False}"
       DJANGO_CSRF_COOKIE_SECURE: "${DJANGO_CSRF_COOKIE_SECURE:-False}"
       SQLITE_PATH: "${SQLITE_PATH:-/app/db.sqlite3}"
-      DJANGO_MEDIA_ROOT: "${DJANGO_MEDIA_ROOT:-/app/media}"
+      DJANGO_MEDIA_ROOT: "${DJANGO_MEDIA_ROOT:-/data/media}"
       DJANGO_STATIC_ROOT: "/data/staticfiles"
     volumes:
       - .:/app

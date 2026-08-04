@@ -8,7 +8,7 @@
     }
 
     handle_path /media/* {
-        root * /app/media
+        root * /srv/ruiqu/media
         file_server
     }
 
