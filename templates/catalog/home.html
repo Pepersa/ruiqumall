@@ -48,9 +48,9 @@
   <div class="cat-tile-grid">
     {% for entry in home_categories %}
       <a class="cat-tile" href="{{ entry.resolved_url }}">
-        <span class="cat-tile-media">
+        <span class="cat-tile-media" style="object-fit: {{ entry.image_display }}">
           {% if entry.image %}
-            <img src="{{ entry.image.url }}" alt="{{ entry.display_title }}">
+            <img src="{{ entry.image.url }}" alt="{{ entry.display_title }}" style="object-fit: {{ entry.image_display }}">
           {% else %}
             <img src="{% static 'img/chemical-placeholder.png' %}" alt="{{ entry.display_title }}">
           {% endif %}

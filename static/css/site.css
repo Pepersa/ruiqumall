@@ -348,9 +348,10 @@ main { max-width: 1240px; margin: 0 auto; padding: 16px 20px 36px; }
 .cat-tile {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  gap: 10px;
-  padding: 20px 14px;
+  align-items: stretch;
+  gap: 0;
+  padding: 0;
+  overflow: hidden;
   background: var(--surface);
   border: 1px solid var(--line);
   border-radius: var(--radius);
@@ -364,17 +365,26 @@ main { max-width: 1240px; margin: 0 auto; padding: 16px 20px 36px; }
   border-color: var(--accent);
 }
 .cat-tile-media {
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  display: block;
   width: 100%;
-  height: 120px;
-  background: #fff;
-  border-radius: 10px;
+  aspect-ratio: 1 / 1;
+  background: var(--soft);
   overflow: hidden;
 }
-.cat-tile-media img { width: 100%; height: 100%; object-fit: contain; }
-.cat-tile-name { font-size: 13px; font-weight: 600; color: var(--ink); line-height: 1.3; }
+.cat-tile-media img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform .25s ease;
+}
+.cat-tile:hover .cat-tile-media img { transform: scale(1.03); }
+.cat-tile-name {
+  padding: 12px 10px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+  line-height: 1.3;
+}
 .cat-tile:hover .cat-tile-name { color: var(--accent-dark); }
 
 /* 场景推荐：顶部 3 卡（Grainger 风格） */

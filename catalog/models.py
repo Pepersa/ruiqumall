@@ -270,6 +270,12 @@ class ProductAttachment(models.Model):
 
 
 class HomeCategory(models.Model):
+    class ImageDisplayMode(models.TextChoices):
+        COVER = 'cover', '覆盖（填充并裁剪）'
+        CONTAIN = 'contain', '包含（完整显示）'
+        FILL = 'fill', '拉伸（填满）'
+        AUTO = 'auto', '自适应（保持比例）'
+
     category = models.ForeignKey(
         Category,
         verbose_name='关联分类',
@@ -280,6 +286,13 @@ class HomeCategory(models.Model):
     )
     title = models.CharField('显示标题', max_length=120, blank=True, help_text='留空则使用分类名称')
     image = models.ImageField('分类图标', upload_to='home_categories/', blank=True)
+    image_display = models.CharField(
+        '图片显示模式',
+        max_length=20,
+        choices=ImageDisplayMode.choices,
+        default=ImageDisplayMode.COVER,
+        help_text='cover: 填充并裁剪（推荐）, contain: 完整显示, fill: 拉伸变形, auto: 浏览器默认',
+    )
     link_url = models.CharField('跳转链接', max_length=255, blank=True, help_text='留空则跳到该分类的产品列表')
     sort_order = models.PositiveIntegerField('排序', default=0)
     is_active = models.BooleanField('启用', default=True)

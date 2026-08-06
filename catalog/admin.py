@@ -1371,6 +1371,10 @@ class HomeCategoryAdmin(admin.ModelAdmin):
         (None, {
             'fields': ('category', 'title', 'image', 'preview_image', 'link_url'),
         }),
+        ('图片显示', {
+            'fields': ('image_display',),
+            'description': '控制图片在分类卡片中的显示方式',
+        }),
         ('显示控制', {
             'fields': ('sort_order', 'is_active'),
         }),
