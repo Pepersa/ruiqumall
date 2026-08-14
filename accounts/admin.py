@@ -1,5 +1,6 @@
 from django.contrib import admin, messages
 from django.contrib.auth import get_user_model
+from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from django.db import transaction
 from django.utils import timezone
 from django.utils.html import format_html
@@ -9,6 +10,9 @@ from .models import RegistrationRequest, UserProfile
 
 User = get_user_model()
 
+# 先取消默认注册，避免冲突
+admin.site.unregister(User)
+
 
 class UserProfileInline(admin.StackedInline):
     model = UserProfile
@@ -17,7 +21,7 @@ class UserProfileInline(admin.StackedInline):
 
 
 @admin.register(User)
-class UserAdmin(admin.ModelAdmin):
+class CustomUserAdmin(BaseUserAdmin):
     list_display = ('username', 'email', 'is_staff', 'is_active', 'date_joined')
     list_filter = ('is_staff', 'is_active', 'is_superuser')
     search_fields = ('username', 'email', 'first_name', 'last_name')
