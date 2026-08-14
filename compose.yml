@@ -1,0 +1,40 @@
+services:
+  web:
+    build: .
+    ports:
+      - "127.0.0.1:${DJANGO_HTTP_PORT:-8000}:8000"
+    environment:
+      DJANGO_DEBUG: "${DJANGO_DEBUG:-True}"
+      DJANGO_SECRET_KEY: "${RUIQU_DJANGO_SECRET_KEY:-${DJANGO_SECRET_KEY:-}}"
+      DJANGO_ALLOWED_HOSTS: "${DJANGO_ALLOWED_HOSTS:-localhost,127.0.0.1,0.0.0.0,ruiqu168.com,www.ruiqu168.com,*.trycloudflare.com,.trycloudflare.com}"
+      DJANGO_CSRF_TRUSTED_ORIGINS: "${DJANGO_CSRF_TRUSTED_ORIGINS:-https://ruiqu168.com,https://www.ruiqu168.com,https://*.trycloudflare.com}"
+      DJANGO_COLLECTSTATIC: "${DJANGO_COLLECTSTATIC:-1}"
+      DJANGO_SECURE_SSL_REDIRECT: "${DJANGO_SECURE_SSL_REDIRECT:-False}"
+      DJANGO_SESSION_COOKIE_SECURE: "${DJANGO_SESSION_COOKIE_SECURE:-False}"
+      DJANGO_CSRF_COOKIE_SECURE: "${DJANGO_CSRF_COOKIE_SECURE:-False}"
+      SQLITE_PATH: "${SQLITE_PATH:-/app/db.sqlite3}"
+      DJANGO_MEDIA_ROOT: "${DJANGO_MEDIA_ROOT:-/data/media}"
+      DJANGO_STATIC_ROOT: "/data/staticfiles"
+    volumes:
+      - .:/app
+      - ruiqu_data:/data
+
+  caddy:
+    image: caddy:2-alpine
+    depends_on:
+      - web
+    ports:
+      - "127.0.0.1:${RUIQU_INTERNAL_CADDY_PORT:-8088}:80"
+    environment:
+      RUIQU_CADDY_SITE_ADDRESS: "${RUIQU_CADDY_SITE_ADDRESS:-:80}"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - .:/app:ro
+      - ruiqu_data:/srv/ruiqu:ro
+      - caddy_data:/data
+      - caddy_config:/config
+
+volumes:
+  ruiqu_data:
+  caddy_data:
+  caddy_config:

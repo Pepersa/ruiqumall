@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}注册账号 - 内部采购平台{% endblock %}
+{% block content %}
+<style>
+.internal-notice {
+  background: linear-gradient(135deg, #fffbeb, #fef9c3);
+  border: 1px solid #fde047;
+  border-radius: 8px;
+  padding: 14px 18px;
+  margin-bottom: 20px;
+  font-size: 14px;
+  color: #713f12;
+}
+.internal-notice strong { display: block; margin-bottom: 4px; font-size: 15px; }
+</style>
+<section class="auth-panel">
+  <h1>注册账号</h1>
+  <div class="internal-notice">
+    <strong>本平台仅对内部客户开放</strong>
+    注册申请提交后，由管理员审核通过后方可登录下单。如有疑问请联系客服。
+  </div>
+  <form method="post" class="auth-form">
+    {% csrf_token %}
+    {% for field in form %}
+      <label>{{ field.label }}{{ field }}</label>
+      {% if field.help_text %}<small>{{ field.help_text }}</small>{% endif %}
+      {% if field.errors %}<div class="field-error">{{ field.errors|join:", " }}</div>{% endif %}
+    {% endfor %}
+    <button type="submit">提交注册申请</button>
+  </form>
+  <p class="auth-switch">已有账号？<a href="{% url 'accounts:login' %}">去登录</a></p>
+</section>
+{% endblock %}

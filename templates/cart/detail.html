@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block title %}购物车{% endblock %}
+{% block content %}
+<section class="page-head">
+  <h1>购物车</h1>
+  <p>核对商品型号和数量后提交采购订单。</p>
+</section>
+{% include "cart/partials/cart_content.html" %}
+{% endblock %}

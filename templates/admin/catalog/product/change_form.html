@@ -1,0 +1,75 @@
+{% extends "admin/change_form.html" %}
+{% load static %}
+
+{% block after_related_objects %}{% endblock %}
+
+{% block extrastyle %}
+{{ block.super }}
+<link rel="stylesheet" href="{% static 'admin/css/catalog-category-cascade.css' %}">
+{% endblock %}
+
+{% block admin_change_form_document_ready %}
+{{ block.super }}
+<script>
+(function () {
+  var HIERARCHY = {{ category_hierarchy_json|safe }};
+
+  function findSelect(name) {
+    var el = document.getElementById('id_' + name);
+    if (el) return el;
+    var list = document.querySelectorAll('select[name="' + name + '"]');
+    return list.length ? list[0] : null;
+  }
+
+  function trigger(el) {
+    el.dispatchEvent(new Event('change', { bubbles: true }));
+  }
+
+  document.addEventListener('DOMContentLoaded', function () {
+    var f1 = findSelect('category_l1');
+    var f2 = findSelect('category_l2');
+    var f3 = findSelect('category_l3');
+    if (!f1 || !f2 || !f3 || !HIERARCHY.length) return;
+
+    f2.disabled = false;
+    f3.disabled = false;
+
+    // L1 change → rebuild L2
+    f1.addEventListener('change', function () {
+      var selected = f1.value;
+      f2.length = 1;
+      f3.length = 1;
+      if (!selected) { f2.disabled = true; f3.disabled = true; return; }
+      f2.disabled = false; f3.disabled = true;
+      var l1 = HIERARCHY.find(function(n){ return n.pk == selected; });
+      if (!l1) return;
+      l1.children.forEach(function(l2) {
+        var o = new Option('\u3000\u3000' + l2.name, l2.pk);
+        o.dataset.level = '2';
+        f2.add(o);
+      });
+      trigger(f2);
+    });
+
+    // L2 change → rebuild L3
+    f2.addEventListener('change', function () {
+      var selected = f2.value;
+      f3.length = 1;
+      if (!selected) { f3.disabled = true; return; }
+      f3.disabled = false;
+      var l1 = HIERARCHY.find(function(n){ return n.children.some(function(l2){ return l2.pk == selected; }); });
+      if (!l1) return;
+      var l2 = l1.children.find(function(l2){ return l2.pk == selected; });
+      if (!l2 || !l2.children.length) { f3.disabled = true; return; }
+      l2.children.forEach(function(l3) {
+        f3.add(new Option('\u3000\u3000\u3000\u3000' + l3.name, l3.pk));
+      });
+      trigger(f3);
+    });
+
+    // Initial L1 selection → auto-populate L2
+    if (f1.value) f1.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+})();
+</script>
+{% endblock %}

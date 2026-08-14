@@ -1,0 +1,12 @@
+{% extends "admin/change_list.html" %}
+{% load i18n admin_urls %}
+
+{% block object-tools-items %}
+  {{ block.super }}
+  <li>
+    <a href="{% url 'admin:catalog_category_export_all' %}" class="addlink">导出全部分类</a>
+  </li>
+  <li>
+    <a href="{% url 'admin:catalog_category_import' %}" class="addlink">导入分类</a>
+  </li>
+{% endblock %}

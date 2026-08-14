@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+{% load static customer_extras catalog_extras %}
+{% block title %}确认订单{% endblock %}
+{% block content %}
+<section class="page-head">
+  <h1>确认订单</h1>
+  <p>核对商品并选择收货地址，确认后提交订单。</p>
+</section>
+
+<div class="checkout-layout" data-address-manager="checkout">
+  <div class="checkout-main">
+    <section class="address-current-panel">
+      <div class="address-current-head">
+        <h2>收货地址 <span class="required-mark">*</span></h2>
+        <button type="button" class="text-link" data-open-address-modal="switch">切换地址</button>
+      </div>
+      <div class="address-current-box" data-address-summary {% if not selected_address %}hidden{% endif %}>
+        <span class="address-grid-badge" data-summary-tag {% if not selected_address.label %}hidden{% endif %}>{{ selected_address.label }}</span>
+        <div class="address-current-main">
+          <div class="address-grid-meta">
+            <span class="address-grid-pin" aria-hidden="true"></span>
+            <span data-summary-region>{% if selected_address %}{{ selected_address.receiver_state }}{{ selected_address.receiver_city }}{{ selected_address.receiver_district }}{% endif %}</span>
+          </div>
+          <strong class="address-grid-line" data-summary-line>{% if selected_address %}{{ selected_address.receiver_address }}{% endif %}</strong>
+          <span class="address-grid-contact" data-summary-contact>
+            {% if selected_address %}{{ selected_address.receiver_name }} {{ selected_address.receiver_mobile|mask_phone }}{% endif %}
+          </span>
+        </div>
+      </div>
+      {% if not addresses %}
+        <p class="empty">还没有保存的收货地址，请先新增地址。</p>
+        <button type="button" class="inline-action-button" data-open-address-modal="add">新增收货地址</button>
+      {% endif %}
+    </section>
+
+    <form class="checkout-form" method="post" data-order-form>
+      {% csrf_token %}
+      <input type="hidden" name="saved_address" value="{{ selected_address_id }}">
+      <input type="hidden" name="receiver_name" value="{{ form.receiver_name.value|default:'' }}">
+      <input type="hidden" name="receiver_mobile" value="{{ form.receiver_mobile.value|default:'' }}">
+      <input type="hidden" name="receiver_state" value="{{ form.receiver_state.value|default:'' }}">
+      <input type="hidden" name="receiver_city" value="{{ form.receiver_city.value|default:'' }}">
+      <input type="hidden" name="receiver_district" value="{{ form.receiver_district.value|default:'' }}">
+      <input type="hidden" name="receiver_address" value="{{ form.receiver_address.value|default:'' }}">
+
+      <label>买家留言 <span class="optional-mark">（选填）</span>{{ form.buyer_message }}</label>
+      {% if form.buyer_message.errors %}<div class="field-error">{{ form.buyer_message.errors|join:", " }}</div>{% endif %}
+      {% if form.receiver_name.errors or form.receiver_mobile.errors or form.receiver_address.errors %}
+        <div class="field-error">请选择或新增完整的收货地址后再提交订单。</div>
+      {% endif %}
+      <button type="submit">确认提交订单</button>
+    </form>
+  </div>
+
+  <aside class="order-preview">
+    <h2>订单商品</h2>
+    {% for item in items %}
+      <div class="preview-line">
+        <strong>{{ item.sku.internal_sku_code }}</strong>
+        <span>{{ item.sku.display_name|truncatechars:44 }}</span>
+        <em>x {{ item.qty|qty }}</em>
+      </div>
+    {% endfor %}
+    <p class="preview-note">提交后由工作人员确认库存和交期</p>
+  </aside>
+</div>
+
+{% include "customers/partials/address_modal.html" with address_next=request.path %}
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'js/address-manager.js' %}"></script>
+{% endblock %}

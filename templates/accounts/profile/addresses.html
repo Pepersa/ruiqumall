@@ -1,0 +1,64 @@
+{% extends "accounts/profile/base.html" %}
+{% load static customer_extras %}
+{% block title %}收货地址{% endblock %}
+{% block profile_content %}
+<section class="page-head profile-head-row">
+  <div>
+    <h1>收货地址</h1>
+    <p>维护常用收货地址，结算时可快速选择。</p>
+  </div>
+  <button type="button" class="inline-action-button" data-open-address-modal="add">新增收货地址</button>
+</section>
+
+<div data-address-manager="profile">
+  {% if addresses %}
+    <div class="address-grid address-grid--page">
+      {% for address in addresses %}
+        <article
+          class="address-grid-card{% if address.is_default %} is-default{% endif %}"
+          data-address-id="{{ address.pk }}"
+          data-address-label="{{ address.label }}"
+          data-receiver-name="{{ address.receiver_name }}"
+          data-receiver-mobile="{{ address.receiver_mobile }}"
+          data-receiver-state="{{ address.receiver_state }}"
+          data-receiver-city="{{ address.receiver_city }}"
+          data-receiver-district="{{ address.receiver_district }}"
+          data-receiver-address="{{ address.receiver_address }}"
+        >
+          {% if address.is_default %}<span class="address-grid-badge">默认</span>{% endif %}
+          <div class="address-grid-card-main">
+            <div class="address-grid-meta">
+              <span class="address-grid-pin" aria-hidden="true"></span>
+              {% if address.label %}<span class="address-grid-tag">{{ address.label }}</span>{% endif %}
+              <span>{{ address.receiver_state }}{{ address.receiver_city }}{{ address.receiver_district }}</span>
+            </div>
+            <strong class="address-grid-line">{{ address.receiver_address }}</strong>
+            <span class="address-grid-contact">{{ address.receiver_name }} {{ address.receiver_mobile|mask_phone }}</span>
+          </div>
+          <div class="address-grid-actions">
+            {% if not address.is_default %}
+              <form method="post" action="{% url 'accounts:profile_address_default' address.pk %}">
+                {% csrf_token %}
+                <button type="submit" class="text-button">设为默认地址</button>
+              </form>
+            {% endif %}
+            <button type="button" class="text-button" data-edit-address="{{ address.pk }}">编辑</button>
+            <form method="post" action="{% url 'accounts:profile_address_delete' address.pk %}" onsubmit="return confirm('确定要删除这个收货地址吗？');">
+              {% csrf_token %}
+              <button type="submit" class="text-button danger-text">删除</button>
+            </form>
+          </div>
+        </article>
+      {% endfor %}
+    </div>
+  {% else %}
+    <p class="empty">还没有保存收货地址。</p>
+  {% endif %}
+</div>
+
+{% include "customers/partials/address_modal.html" with address_next=request.path selected_address_id="" %}
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'js/address-manager.js' %}"></script>
+{% endblock %}

@@ -1,0 +1,222 @@
+{% extends "admin/base_site.html" %}
+{% load i18n %}
+
+{% block extrahead %}
+  {{ block.super }}
+  <style>
+    .product-image-admin-note { color: var(--body-quiet-color); }
+    .product-image-upload-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(280px, 1fr));
+      gap: 20px;
+      margin: 20px 0 30px;
+    }
+    .product-image-upload-card,
+    .product-image-section {
+      padding: 20px;
+      border: 1px solid var(--hairline-color);
+      border-radius: 6px;
+      background: var(--body-bg);
+    }
+    .product-image-upload-card h2,
+    .product-image-section h2 { margin-top: 0; }
+    .product-image-upload-card form { display: grid; gap: 14px; }
+    .product-image-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+      gap: 18px;
+    }
+    .product-image-card {
+      overflow: hidden;
+      border: 1px solid var(--hairline-color);
+      border-radius: 6px;
+      background: var(--darkened-bg);
+    }
+    .product-image-preview {
+      display: grid;
+      place-items: center;
+      height: 180px;
+      padding: 10px;
+      background: #fff;
+    }
+    .product-image-preview img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+    }
+    .product-image-meta {
+      display: grid;
+      gap: 10px;
+      padding: 12px;
+    }
+    .product-image-name {
+      overflow-wrap: anywhere;
+      font-size: 12px;
+    }
+    .product-image-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .product-image-actions form { margin: 0; }
+    .product-image-primary {
+      display: inline-block;
+      padding: 3px 7px;
+      border-radius: 999px;
+      background: #e7f4e8;
+      color: #237b2c;
+      font-size: 11px;
+      font-weight: 700;
+    }
+    .product-image-delete {
+      border: 0;
+      background: transparent;
+      color: var(--delete-button-bg);
+      cursor: pointer;
+      padding: 4px 0;
+    }
+    .product-image-empty {
+      padding: 24px;
+      color: var(--body-quiet-color);
+      text-align: center;
+    }
+    @media (max-width: 800px) {
+      .product-image-upload-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+{% endblock %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+  <a href="{% url 'admin:index' %}">{% translate 'Home' %}</a>
+  &rsaquo; <a href="{% url 'admin:app_list' app_label=opts.app_label %}">{{ opts.app_config.verbose_name }}</a>
+  &rsaquo; <a href="{% url 'admin:catalog_product_changelist' %}">{{ opts.verbose_name_plural|capfirst }}</a>
+  &rsaquo; <a href="{% url 'admin:catalog_product_change' product.pk %}">{{ product }}</a>
+  &rsaquo; 产品图片
+</div>
+{% endblock %}
+
+{% block content %}
+<div id="content-main">
+  <h1>{{ title }}</h1>
+  <p class="product-image-admin-note">
+    款式编码：<strong>{{ product.style_code }}</strong>；
+    图片目录：<code>product_catalog/{{ product.style_code }}/</code>。
+    支持 JPG、JPEG、PNG、WEBP、AVIF，单张不超过 {{ max_upload_mb }} MB。
+  </p>
+
+  <div class="product-image-upload-grid">
+    <section class="product-image-upload-card">
+      <h2>上传主图</h2>
+      <p>上传后会覆盖当前主图（只保留一张）。首次上传自动设为主图。</p>
+      <form method="post" enctype="multipart/form-data">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="upload">
+        <input type="hidden" name="image_type" value="main">
+        <input type="file" name="images" accept="image/jpeg,image/png,image/webp,image/avif" multiple required>
+        <div><button type="submit" class="button default">上传主图</button></div>
+      </form>
+    </section>
+
+    <section class="product-image-upload-card">
+      <h2>上传详情图</h2>
+      <p>详情图会按文件名顺序显示在产品详情页。</p>
+      <form method="post" enctype="multipart/form-data">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="upload">
+        <input type="hidden" name="image_type" value="detail">
+        <input type="file" name="images" accept="image/jpeg,image/png,image/webp,image/avif" multiple required>
+        <div><button type="submit" class="button default">上传详情图</button></div>
+      </form>
+    </section>
+  </div>
+
+  <section class="product-image-section">
+    <h2>主图透图（{{ main_images|length }}）</h2>
+    {% if main_images %}
+      <div class="product-image-grid">
+        {% for image in main_images %}
+          {% include "admin/catalog/product/image_card.html" with image=image allow_primary=True %}
+        {% endfor %}
+      </div>
+    {% else %}
+      <div class="product-image-empty">尚未上传主图。</div>
+    {% endif %}
+  </section>
+
+  <section class="product-image-section" style="margin-top:20px">
+    <h2>详情页（{{ detail_images|length }}）</h2>
+    {% if detail_images %}
+      <div class="product-image-grid">
+        {% for image in detail_images %}
+          {% include "admin/catalog/product/image_card.html" with image=image allow_primary=False %}
+        {% endfor %}
+      </div>
+    {% else %}
+      <div class="product-image-empty">尚未上传详情图。</div>
+    {% endif %}
+  </section>
+
+  <section class="product-image-section" style="margin-top:20px">
+    <h2>商品说明文档</h2>
+    <p>上传 PDF、商品说明书、TDS、COA 等文档，供采购商在详情页下载。</p>
+    <form method="post" enctype="multipart/form-data" style="margin:14px 0">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="upload_document">
+      <input type="file" name="files" accept="application/pdf,.pdf" multiple required>
+      <div style="margin-top:10px"><button type="submit" class="button default">上传文档</button></div>
+    </form>
+    {% if documents %}
+      <div style="margin-top:12px">
+        {% for doc in documents %}
+          <div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--hairline-color)">
+            <a href="{{ doc.file.url }}" target="_blank" rel="noopener" style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ doc.title }}</a>
+            <span style="color:var(--body-quiet-color);font-size:12px">{{ doc.uploaded_at|date:"Y-m-d H:i" }}</span>
+            <form method="post" onsubmit="return confirm('确定删除该文档吗？');" style="margin:0">
+              {% csrf_token %}
+              <input type="hidden" name="action" value="delete_document">
+              <input type="hidden" name="document_id" value="{{ doc.pk }}">
+              <button type="submit" class="product-image-delete">删除</button>
+            </form>
+          </div>
+        {% endfor %}
+      </div>
+    {% else %}
+      <div class="product-image-empty">尚未上传商品说明文档。</div>
+    {% endif %}
+  </section>
+
+  <section class="product-image-section" style="margin-top:20px">
+    <h2>轮播图</h2>
+    <p>轮播图会显示在详情页产品图下方，支持 JPG、PNG，支持一次上传多张。</p>
+    <form method="post" enctype="multipart/form-data" style="margin:14px 0">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="upload_carousel">
+      <input type="file" name="carousel_images" accept="image/jpeg,image/png,image/webp" multiple required>
+      <div style="margin-top:10px"><button type="submit" class="button default">上传轮播图</button></div>
+    </form>
+    {% if carousel_images %}
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:14px;margin-top:14px">
+        {% for img in carousel_images %}
+          <div style="border:1px solid var(--hairline-color);border-radius:6px;overflow:hidden;background:var(--darkened-bg)">
+            <div style="height:140px;display:grid;place-items:center;padding:8px;background:#fff">
+              <img src="{{ img.file.url }}" alt="{{ img.title }}" style="max-width:100%;max-height:100%;object-fit:contain">
+            </div>
+            <div style="padding:8px;display:flex;align-items:center;justify-content:space-between;gap:6px">
+              <span style="font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1">{{ img.title }}</span>
+              <form method="post" onsubmit="return confirm('确定删除该图片吗？');" style="margin:0;flex-shrink:0">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="delete_carousel">
+                <input type="hidden" name="document_id" value="{{ img.pk }}">
+                <button type="submit" class="product-image-delete">删除</button>
+              </form>
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+    {% else %}
+      <div class="product-image-empty">尚未上传轮播图。</div>
+    {% endif %}
+  </section>
+</div>
+{% endblock %}

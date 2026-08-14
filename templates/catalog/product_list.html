@@ -1,0 +1,126 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}产品目录{% endblock %}
+{% block content %}
+<section class="page-head">
+  <h1 class="catalog-title">{% if selected_category %}{{ selected_category.name }}{% else %}产品目录{% endif %}</h1>
+  <nav class="breadcrumb">
+    <a href="{% url 'home' %}">首页</a>
+    {% for category in breadcrumbs %}
+      <span>/</span>
+      <a href="{% url 'catalog:product_list' %}?category={{ category.slug }}">{{ category.name }}</a>
+    {% endfor %}
+  </nav>
+</section>
+
+<div class="catalog-layout catalog-layout--full">
+  <section class="results">
+    <section class="category-panel" id="category-panel">
+      
+      <div class="category-panel-body" id="category-panel-body">
+
+        {% if hierarchy_level %}
+          <div class="category-panel-row" id="category-row">
+            <span class="category-panel-label">分类</span>
+            <div class="category-panel-chips" id="category-chips">
+              {% if hierarchy_parent_slug %}<a class="chip" href="?{% if category_querystring %}{{ category_querystring }}&{% endif %}">← 全部分类</a>{% endif %}
+              {% for cat in hierarchy_level %}
+                <a class="chip {% if filters.category == cat.slug %}active{% endif %}" href="?{% if category_querystring %}{{ category_querystring }}&{% endif %}category={{ cat.slug }}">
+                  <span>{{ cat.name }}</span>
+                </a>
+              {% endfor %}
+            </div>
+            <button class="expand-trigger" id="category-expand" data-row="category" style="display:none;">
+              <span class="expand-text"></span><span class="expand-arrow">›</span>
+            </button>
+          </div>
+        {% endif %}
+        {% if brands %}
+          <div class="category-panel-row" id="brand-row">
+            <span class="category-panel-label">品牌</span>
+            <div class="category-panel-chips" id="brand-chips">
+              <a class="chip {% if not filters.brand %}active{% endif %}" href="?{{ brand_querystring }}">全部</a>
+              {% for brand in brands %}
+                <a class="chip {% if filters.brand == brand %}active{% endif %}" href="?{% if brand_querystring %}{{ brand_querystring }}&{% endif %}brand={{ brand }}">{{ brand }}</a>
+              {% endfor %}
+            </div>
+            <button class="expand-trigger" id="brand-expand" data-row="brand" style="display:none;">
+              <span class="expand-text"></span><span class="expand-arrow">›</span>
+            </button>
+          </div>
+        {% endif %}
+      </div>
+    </section>
+
+    <div data-product-region>
+    {% if products %}
+    <div class="product-grid" id="product-list">
+      {% for product in products %}
+        {% include "catalog/partials/product_card.html" %}
+      {% empty %}
+      <p class="empty">没有找到匹配产品，请调整关键词或联系销售。</p>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="product-grid" id="product-list">
+      <p class="empty">没有找到匹配产品，请调整关键词或联系销售。</p>
+    </div>
+    {% endif %}
+    <nav class="pagination-bar" id="pagination" data-product-pagination aria-label="产品列表分页">
+      <div class="pagination-total">共 {{ paginator.count }} 条</div>
+      <div class="pagination-pages">
+        {% if page_obj.has_previous %}
+          <a class="page-button" href="?{% if page_querystring %}{{ page_querystring }}&{% endif %}page={{ page_obj.previous_page_number }}" aria-label="上一页">&lt;</a>
+        {% else %}
+          <span class="page-button disabled" aria-disabled="true">&lt;</span>
+        {% endif %}
+
+        {% for item in page_items %}
+          {% if item == 'ellipsis' or item == 'ellipsis-left' or item == 'ellipsis-right' %}
+            <span class="page-ellipsis">...</span>
+          {% elif item == page_obj.number %}
+            <span class="page-button active" aria-current="page">{{ item }}</span>
+          {% else %}
+            <a class="page-button" href="?{% if page_querystring %}{{ page_querystring }}&{% endif %}page={{ item }}">{{ item }}</a>
+          {% endif %}
+        {% endfor %}
+
+        {% if page_obj.has_next %}
+          <a class="page-button" href="?{% if page_querystring %}{{ page_querystring }}&{% endif %}page={{ page_obj.next_page_number }}" aria-label="下一页">&gt;</a>
+        {% else %}
+          <span class="page-button disabled" aria-disabled="true">&gt;</span>
+        {% endif %}
+      </div>
+
+      <form class="page-size-form" method="get">
+        {% for key, value in filters.items %}
+          {% if key != 'page' and key != 'page_size' %}
+            <input type="hidden" name="{{ key }}" value="{{ value }}">
+          {% endif %}
+        {% endfor %}
+        <select name="page_size" onchange="this.form.submit()" aria-label="每页条数">
+          {% for option in page_size_options %}
+            <option value="{{ option }}" {% if option == page_size %}selected{% endif %}>{{ option }} 条/页</option>
+          {% endfor %}
+        </select>
+      </form>
+
+      <form class="jump-form" method="get">
+        {% for key, value in filters.items %}
+          {% if key != 'page' %}
+            <input type="hidden" name="{{ key }}" value="{{ value }}">
+          {% endif %}
+        {% endfor %}
+        <span>跳至</span>
+        <input type="number" name="page" min="1" max="{{ paginator.num_pages }}" value="{{ page_obj.number }}" aria-label="跳转页码">
+        <button type="submit">确定</button>
+      </form>
+    </nav>
+    </div>
+  </section>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'js/product-list.js' %}"></script>
+{% endblock %}

@@ -1,0 +1,44 @@
+{% extends "admin/base_site.html" %}
+{% load i18n %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+  <a href="{% url 'admin:index' %}">{% translate 'Home' %}</a>
+  &rsaquo; <a href="{% url 'admin:app_list' app_label=opts.app_label %}">{{ opts.app_config.verbose_name }}</a>
+  &rsaquo; <a href="{% url 'admin:catalog_product_changelist' %}">{{ opts.verbose_name_plural|capfirst }}</a>
+  &rsaquo; 导入产品
+</div>
+{% endblock %}
+
+{% block content %}
+<div id="content-main">
+  <h1>批量导入产品</h1>
+  <p>请上传 Excel 文件，工作表名称为 <strong>产品</strong> 或 <strong>Sheet1</strong>。每行代表一个 SKU，必填列：<strong>商品编码</strong>、<strong>商品名称</strong>、<strong>基本售价</strong>、分类目录。可先导出产品作为模板。</p>
+  <p>特殊属性请直接使用分类属性名称作为 Excel 列名，例如<strong>孔径</strong>、<strong>碘值</strong>。系统会根据该行所属分类自动写入 SKU；未出现在文件中的特殊属性列会保留原值。请先在“产品分类”中配置属性模板。</p>
+  <form method="post" enctype="multipart/form-data">
+    {% csrf_token %}
+    <fieldset class="module aligned">
+      <div class="form-row">
+        <label for="id_import_file">Excel 文件</label>
+        <input type="file" name="import_file" id="id_import_file" accept=".xlsx" required>
+      </div>
+      <div class="form-row">
+        <label for="id_allow_missing_price">
+          <input type="checkbox" name="allow_missing_price" id="id_allow_missing_price">
+          允许价格或分类为空（开发/补录数据时使用）
+        </label>
+      </div>
+      <div class="form-row">
+        <label for="id_dry_run">
+          <input type="checkbox" name="dry_run" id="id_dry_run">
+          仅校验，不写入数据库
+        </label>
+      </div>
+    </fieldset>
+    <div class="submit-row">
+      <input type="submit" value="开始导入" class="default">
+      <a href="{% url 'admin:catalog_product_changelist' %}" class="button cancel-link">返回列表</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

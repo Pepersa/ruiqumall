@@ -1,0 +1,41 @@
+<div class="cat-accordion">
+  {% for root in category_tree %}
+    {% with root_children=root.children.all %}
+      {% if root_children %}
+        <details class="cat-node" {% if root == selected_category or root in breadcrumbs %}open{% endif %}>
+          <summary>
+            <a href="{% url 'catalog:product_list' %}?category={{ root.slug }}" class="{% if filters.category == root.slug %}active{% endif %}">{{ root.name }}</a>
+          </summary>
+          <div class="cat-children">
+            {% for second in root_children %}
+              {% if second.is_active %}
+                {% with second_children=second.children.all %}
+                  {% if second_children %}
+                    <details class="cat-node cat-node--sub" {% if second == selected_category or second in breadcrumbs %}open{% endif %}>
+                      <summary>
+                        <a href="{% url 'catalog:product_list' %}?category={{ second.slug }}" class="{% if filters.category == second.slug %}active{% endif %}">{{ second.name }}</a>
+                      </summary>
+                      <div class="cat-children cat-children--leaf">
+                        {% for third in second_children %}
+                          {% if third.is_active %}
+                            <a class="cat-leaf {% if filters.category == third.slug %}active{% endif %}" href="{% url 'catalog:product_list' %}?category={{ third.slug }}">{{ third.name }}</a>
+                          {% endif %}
+                        {% endfor %}
+                      </div>
+                    </details>
+                  {% else %}
+                    <a class="cat-mid {% if filters.category == second.slug %}active{% endif %}" href="{% url 'catalog:product_list' %}?category={{ second.slug }}">{{ second.name }}</a>
+                  {% endif %}
+                {% endwith %}
+              {% endif %}
+            {% endfor %}
+          </div>
+        </details>
+      {% else %}
+        <a class="cat-root cat-root--leaf {% if filters.category == root.slug %}active{% endif %}" href="{% url 'catalog:product_list' %}?category={{ root.slug }}">{{ root.name }}</a>
+      {% endif %}
+    {% endwith %}
+  {% empty %}
+    <p class="empty">暂无分类。</p>
+  {% endfor %}
+</div>

@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}登录 - 内部采购平台{% endblock %}
+{% block content %}
+<style>
+.login-internal-notice {
+  background: linear-gradient(135deg, #eff6ff, #dbeafe);
+  border: 1px solid #93c5fd;
+  border-radius: 8px;
+  padding: 12px 16px;
+  margin-bottom: 20px;
+  font-size: 13.5px;
+  color: #1e40af;
+}
+</style>
+<section class="auth-panel">
+  <h1>登录</h1>
+  <div class="login-internal-notice">
+    本平台为内部客户采购系统。尚未注册？<a href="{% url 'accounts:register' %}">提交注册申请</a>
+  </div>
+  <form method="post" class="auth-form">
+    {% csrf_token %}
+    {{ form.non_field_errors }}
+    <label>用户名{{ form.username }}</label>
+    <label>密码{{ form.password }}</label>
+    {% if next %}<input type="hidden" name="next" value="{{ next }}">{% endif %}
+    <button type="submit">登录</button>
+  </form>
+  <p class="auth-switch">还没有账号？<a href="{% url 'accounts:register' %}">提交注册申请</a></p>
+</section>
+{% endblock %}
