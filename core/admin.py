@@ -1,6 +1,15 @@
 from django.contrib import admin
 
-from .models import AuditLog, SiteConfig
+from .models import AuditLog, SiteConfig, SiteSettings
+
+
+@admin.register(SiteSettings)
+class SiteSettingsAdmin(admin.ModelAdmin):
+    """网站联系方式管理"""
+    list_display = ('phone', 'email', 'updated_at')
+    fieldsets = [
+        (None, {'fields': ['phone', 'email']}),
+    ]
 
 
 @admin.register(SiteConfig)

@@ -17,6 +17,25 @@ class SiteConfig(models.Model):
         return self.key
 
 
+class SiteSettings(models.Model):
+    """网站联系方式设置"""
+    phone = models.CharField('联系电话', max_length=50, blank=True, default='')
+    email = models.EmailField('联系邮箱', blank=True, default='')
+    updated_at = models.DateTimeField('更新时间', auto_now=True)
+
+    class Meta:
+        verbose_name = '网站联系方式'
+        verbose_name_plural = '网站联系方式'
+
+    def __str__(self):
+        return '网站联系方式'
+
+    @classmethod
+    def get_settings(cls):
+        obj, _ = cls.objects.get_or_create(pk=1)
+        return obj
+
+
 class AuditLog(models.Model):
     actor = models.ForeignKey(
         settings.AUTH_USER_MODEL,

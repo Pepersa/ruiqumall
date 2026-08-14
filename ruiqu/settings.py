@@ -122,6 +122,7 @@ TEMPLATES = [
                 'django.contrib.messages.context_processors.messages',
                 'cart.context_processors.cart_context',
                 'catalog.context_processors.category_navigation',
+                'core.context_processors.site_settings',
             ],
         },
     },
