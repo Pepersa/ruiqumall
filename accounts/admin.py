@@ -26,7 +26,6 @@ class UserAdmin(admin.ModelAdmin):
     fieldsets = (
         (None, {'fields': ('username', 'password')}),
         ('个人信息', {'fields': ('first_name', 'last_name', 'email')}),
-        ('联系方式', {'fields': ('phone',)}),
         ('权限', {'fields': ('is_active', 'is_staff', 'is_superuser', 'groups', 'user_permissions')}),
         ('重要日期', {'fields': ('last_login', 'date_joined')}),
     )
@@ -37,7 +36,6 @@ class UserAdmin(admin.ModelAdmin):
             return [
                 (None, {'fields': ('username', 'password')}),
                 ('个人信息', {'fields': ('first_name', 'last_name', 'email')}),
-                ('联系方式', {'fields': ('phone',)}),
                 ('权限', {'fields': ('is_active', 'is_staff', 'is_superuser', 'groups', 'user_permissions')}),
                 ('重要日期', {'fields': ('last_login', 'date_joined')}),
             ]
