@@ -23,6 +23,7 @@
         src="{{ product_gallery_images.0.url }}"
         alt="{{ product.name }}"
         referrerpolicy="no-referrer"
+        style="height:360px"
       >
     </div>
     {% if product_gallery_images|length > 1 %}
@@ -42,7 +43,7 @@
     {% else %}
     <div class="product-gallery-stage">
       <span class="product-gallery-badge">产品图</span>
-      <img src="{{ product_main_image_url }}" alt="{{ product.name }}" referrerpolicy="no-referrer">
+      <img src="{{ product_main_image_url }}" alt="{{ product.name }}" referrerpolicy="no-referrer" style="height:360px">
     </div>
     {% endif %}
     <div class="product-gallery-foot">
