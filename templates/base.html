@@ -14,7 +14,7 @@
     </a>
     <div class="header-search">
       {% include "catalog/partials/category_flyout_nav.html" %}
-      <form class="top-search" action="{% url 'catalog:product_list' %}" method="get">
+      <form class="top-search" action="{% url 'catalog:product_list' %}" method="get" data-suggest-url="{% url 'catalog:search_suggest' %}">
         <input name="q" value="{{ request.GET.q }}" placeholder="搜索产品名、SKU、CAS、品牌、规格" aria-label="搜索商品">
         <button type="submit" aria-label="搜索">搜索</button>
       </form>
@@ -55,6 +55,7 @@
     <span>工作日内确认库存和交期</span>
   </footer>
   {% block extra_js %}{% endblock %}
+  <script src="{% static 'js/search-suggest.js' %}"></script>
   <script src="{% static 'js/cart-add.js' %}?t={% now 'YmdHis' %}"></script>
 </body>
 </html>

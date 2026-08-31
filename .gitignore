@@ -56,6 +56,11 @@ htmlcov/
 coverage.xml
 *.cover
 
+# ===== 调试脚本 =====
+test_*.py
+test_*_out.txt
+test_*.log
+
 # ===== Excel / Office lock & temp files =====
 .~lock.*
 ~$*

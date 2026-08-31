@@ -4,6 +4,9 @@
 {% block object-tools-items %}
   {{ block.super }}
   <li>
+    <a href="{% url 'admin:catalog_product_brand_sort' %}" class="addlink">按品牌调整排序号</a>
+  </li>
+  <li>
     <a href="{% url 'admin:catalog_product_export_all' %}" class="addlink">导出全部产品</a>
   </li>
   <li>

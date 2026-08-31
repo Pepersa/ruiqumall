@@ -143,13 +143,14 @@ class Product(models.Model):
     source_file_name = models.CharField('来源文件', max_length=255, blank=True)
     source_created_by = models.CharField('来源创建人', max_length=120, blank=True)
     status = models.CharField('状态', max_length=20, choices=PublishStatus.choices, default=PublishStatus.PUBLISHED)
+    sort_order = models.PositiveIntegerField('目录排序', default=0, help_text='商品目录列表的展示顺序，值小的靠前；相同值时按名称排序')
     created_at = models.DateTimeField('创建时间', auto_now_add=True)
     updated_at = models.DateTimeField('更新时间', auto_now=True)
 
     class Meta:
         verbose_name = '产品'
         verbose_name_plural = '产品'
-        ordering = ['name']
+        ordering = ['sort_order', 'name']
         indexes = [
             models.Index(fields=['style_code']),
             models.Index(fields=['brand']),
@@ -157,6 +158,7 @@ class Product(models.Model):
             models.Index(fields=['status']),
             models.Index(fields=['category', 'status']),
             models.Index(fields=['brand', 'name', 'manufacturer_model'], name='catalog_pro_brand_n_d61f24_idx'),
+            models.Index(fields=['sort_order'], name='catalog_pro_sort_or_8c1a23_idx'),
         ]
 
     def __str__(self):
@@ -370,6 +372,88 @@ class HomeScene(models.Model):
             *[models.When(pk=pk, then=models.Value(idx)) for pk, idx in preserved.items()],
             default=models.Value(len(ids)),
         ))
+
+
+class HomeBrand(models.Model):
+    """主页「品牌馆」精选：管理员可挑选要展示的品牌并上传 logo。
+
+    - `brand_key` 必须与 Product.brand 字段完全一致（用于 ?brand= 过滤）。
+      留空时回退到 `name`（仅当 name 与 Product.brand 文本相同时才会生效）。
+    - `logo` 为空时品牌卡片只显示品牌名。
+    """
+
+    name = models.CharField('品牌名称', max_length=120)
+    brand_key = models.CharField(
+        '品牌 Key',
+        max_length=120,
+        blank=True,
+        help_text='用于在 Product.brand 中精确匹配；留空则使用上方名称',
+    )
+    logo = models.ImageField(
+        '品牌 Logo',
+        upload_to='home_brands/',
+        blank=True,
+    )
+    description = models.CharField('一句话简介', max_length=160, blank=True)
+    link_url = models.CharField(
+        '跳转链接',
+        max_length=255,
+        blank=True,
+        help_text='留空则按品牌 Key 过滤产品列表',
+    )
+    sort_order = models.PositiveIntegerField('排序', default=0)
+    is_active = models.BooleanField('启用', default=True)
+    created_at = models.DateTimeField('创建时间', auto_now_add=True)
+    updated_at = models.DateTimeField('更新时间', auto_now=True)
+
+    class Meta:
+        verbose_name = '主页品牌'
+        verbose_name_plural = '主页品牌'
+        ordering = ['sort_order', 'id']
+        indexes = [
+            models.Index(fields=['is_active', 'sort_order']),
+            models.Index(fields=['brand_key']),
+        ]
+
+    def __str__(self):
+        return self.name
+
+    @property
+    def display_name(self):
+        return self.name
+
+    @property
+    def filter_key(self):
+        """用于 ProductListView ?brand= 过滤的精确字符串（直接取 name）。"""
+        return self.name.strip()
+
+    @property
+    def resolved_url(self):
+        from django.urls import reverse
+        return reverse('catalog:product_list') + f'?brand={self.filter_key}'
+
+
+class BrandOrder(models.Model):
+    """商品目录品牌筛选的自定义排序。管理员可在后台配置各品牌的显示顺序。
+
+    - `brand` 必须与 Product.brand 字段完全一致。
+    - 未在本表配置的品牌将按字母顺序排在已配置品牌之后。
+    - `is_active=True` 时该品牌才会在筛选中显示。
+    """
+
+    brand = models.CharField('品牌名称', max_length=120, unique=True)
+    sort_order = models.PositiveIntegerField('排序', default=0)
+    is_active = models.BooleanField('启用', default=True, help_text='关闭后该品牌不在筛选中显示')
+    created_at = models.DateTimeField('创建时间', auto_now_add=True)
+    updated_at = models.DateTimeField('更新时间', auto_now=True)
+
+    class Meta:
+        verbose_name = '品牌排序'
+        verbose_name_plural = '品牌排序'
+        ordering = ['sort_order', 'brand']
+
+    def __str__(self):
+        return self.brand
 
 
 class HomeSceneProduct(models.Model):

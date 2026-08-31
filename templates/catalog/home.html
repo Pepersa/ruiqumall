@@ -10,7 +10,7 @@
   </div>
   <div class="scene-tile-grid">
     {% for scene in home_scenes %}
-      <a class="scene-tile" href="{% url 'home_scene' scene.slug %}">
+      <a class="scene-tile" href="{% url 'catalog:home_scene' scene.slug %}">
         <div class="scene-tile-media">
           {% if scene.banner_image %}
             <img src="{{ scene.banner_image.url }}" alt="{{ scene.title }}">
@@ -62,4 +62,27 @@
     {% endfor %}
   </div>
 </section>
+
+{% if home_brands %}
+<section class="content-band home-brands" id="brands">
+  <div class="section-title">
+    <h2>品牌馆</h2>
+    <a class="section-title-link" href="{% url 'catalog:product_list' %}">查看全部品牌 ›</a>
+  </div>
+  <div class="brand-tile-grid">
+    {% for brand in home_brands %}
+      <a class="brand-tile" href="{{ brand.resolved_url }}" title="{{ brand.description|default:brand.display_name }}">
+        <span class="brand-tile-media">
+          {% if brand.logo %}
+            <img src="{{ brand.logo.url }}" alt="{{ brand.display_name }}">
+          {% else %}
+            <span class="brand-tile-fallback">{{ brand.display_name }}</span>
+          {% endif %}
+        </span>
+        <span class="brand-tile-name">{{ brand.display_name }}</span>
+      </a>
+    {% endfor %}
+  </div>
+</section>
+{% endif %}
 {% endblock %}

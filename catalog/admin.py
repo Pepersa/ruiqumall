@@ -17,9 +17,11 @@ from django.utils.safestring import mark_safe
 
 from .category_io import expand_category_queryset, export_categories_response, import_categories_file
 from .models import (
+    BrandOrder,
     Category,
     CategoryAttribute,
     CustomerSKUPrice,
+    HomeBrand,
     HomeCategory,
     HomeScene,
     HomeSceneProduct,
@@ -641,12 +643,13 @@ class CategoryAttributeAdmin(admin.ModelAdmin):
 @admin.register(Product)
 class ProductAdmin(admin.ModelAdmin):
     form = ProductAdminForm
-    list_display = ('name', 'style_code', 'brand', 'category', 'status', 'has_product_image', 'active_sku_count', 'updated_at')
+    list_display = ('name', 'style_code', 'brand', 'category', 'status', 'sort_order', 'has_product_image', 'active_sku_count', 'updated_at')
     list_filter = ('status', 'category', 'brand')
     search_fields = ('name', 'alias', 'style_code', 'cas_no', 'brand', 'skus__internal_sku_code')
     inlines = (ProductAttachmentInline,)
     readonly_fields = ('manage_product_images_link', 'manage_skus_link')
     actions = ('export_selected_products',)
+    list_editable = ('sort_order',)
     change_list_template = 'admin/catalog/product/change_list.html'
     fieldsets = (
         (
@@ -662,6 +665,7 @@ class ProductAdmin(admin.ModelAdmin):
                     'category_l3',
                     'brand',
                     'status',
+                    'sort_order',
                 )
             },
         ),
@@ -686,6 +690,7 @@ class ProductAdmin(admin.ModelAdmin):
                         'category_l3',
                         'brand',
                         'status',
+                        'sort_order',
                     )
                 },
             ),
@@ -721,6 +726,7 @@ class ProductAdmin(admin.ModelAdmin):
                             'category_l3',
                             'brand',
                             'status',
+                            'sort_order',
                         )
                     },
                 ),
@@ -794,6 +800,11 @@ class ProductAdmin(admin.ModelAdmin):
                 'listing-images/',
                 self.admin_site.admin_view(self.listing_images_view),
                 name='catalog_product_listing_images',
+            ),
+            path(
+                'brand-sort/',
+                self.admin_site.admin_view(self.brand_sort_view),
+                name='catalog_product_brand_sort',
             ),
             path(
                 '<path:object_id>/images/',
@@ -1113,6 +1124,78 @@ class ProductAdmin(admin.ModelAdmin):
             'title': '导入产品',
         }
         return render(request, 'admin/catalog/product/import_form.html', context)
+
+    def brand_sort_view(self, request):
+        """按品牌批量调整产品排序号。
+
+        GET: 选择品牌后展示该品牌下所有上架产品，可逐项填写排序号。
+        POST: 把每行的 sort_order 写回数据库；其他字段不受影响。
+        """
+        if not self.has_change_permission(request):
+            raise PermissionDenied
+
+        # 收集所有出现过产品的品牌，按字母序展示；带 BrandOrder 优先。
+        ordered_brands = list(
+            BrandOrder.objects.filter(is_active=True)
+            .values_list('brand', flat=True)
+            .order_by('sort_order')
+        )
+        all_brands = list(
+            Product.objects.exclude(brand='')
+            .values_list('brand', flat=True)
+            .distinct()
+        )
+        unordered_brands = sorted(b for b in all_brands if b not in ordered_brands)
+        brands = ordered_brands + unordered_brands
+
+        selected_brand = request.GET.get('brand') or request.POST.get('brand', '').strip()
+        saved = False
+        if request.method == 'POST':
+            if not selected_brand:
+                self.message_user(request, '请先选择品牌。', level=messages.ERROR)
+            else:
+                updates = 0
+                for key, raw_value in request.POST.items():
+                    if not key.startswith('order_'):
+                        continue
+                    try:
+                        pk = int(key[len('order_'):])
+                    except ValueError:
+                        continue
+                    try:
+                        new_sort = int(str(raw_value).strip() or '0')
+                    except ValueError:
+                        new_sort = 0
+                    new_sort = max(0, new_sort)
+                    updated = Product.objects.filter(pk=pk, brand=selected_brand).update(
+                        sort_order=new_sort,
+                    )
+                    updates += updated
+                self.message_user(
+                    request,
+                    f'品牌「{selected_brand}」已更新 {updates} 个产品的排序号。',
+                    level=messages.SUCCESS,
+                )
+                saved = True
+
+        products = []
+        if selected_brand:
+            products = list(
+                Product.objects.filter(brand=selected_brand)
+                .select_related('category')
+                .order_by('sort_order', 'name', 'id')
+            )
+
+        context = {
+            **self.admin_site.each_context(request),
+            'opts': self.model._meta,
+            'title': '按品牌调整排序号',
+            'brands': brands,
+            'selected_brand': selected_brand,
+            'products': products,
+            'saved': saved,
+        }
+        return render(request, 'admin/catalog/product/brand_sort.html', context)
 
     def formfield_for_foreignkey(self, db_field, request, **kwargs):
         if db_field.name == 'category':
@@ -1459,4 +1542,135 @@ class HomeSceneAdmin(admin.ModelAdmin):
     }
 
 
-# Register your models here.
+class HomeBrandForm(forms.ModelForm):
+    name = forms.ChoiceField(label='品牌名称', required=True, choices=[('', '— 选择已有品牌 —')])
+
+    class Meta:
+        model = HomeBrand
+        # 品牌 Key / 跳转链接 后台不再使用，从表单中移除
+        fields = ('name', 'logo', 'description', 'sort_order', 'is_active')
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # 预填当前值
+        current = self.initial.get('name') or (self.instance.name if self.instance and self.instance.pk else '')
+        choices = [('', '— 选择已有品牌 —')]
+        existing = (
+            Product.objects.exclude(brand='')
+            .values_list('brand', flat=True)
+            .distinct()
+            .order_by('brand')
+        )
+        for brand in existing:
+            choices.append((brand, brand))
+        if current and not any(c[0] == current for c in choices):
+            choices.append((current, current))
+        self.fields['name'].choices = choices
+
+    class Media:
+        js = ('admin/js/catalog-homebrand.js',)
+
+
+@admin.register(HomeBrand)
+class HomeBrandAdmin(admin.ModelAdmin):
+    form = HomeBrandForm
+    list_display = ('display_name', 'preview_logo', 'sort_order', 'is_active', 'updated_at')
+    list_filter = ('is_active',)
+    list_editable = ('sort_order', 'is_active')
+    search_fields = ('name', 'description')
+    readonly_fields = ('preview_logo', 'created_at', 'updated_at')
+
+    def get_urls(self):
+        custom_urls = [
+            path(
+                'api-brands/',
+                self.admin_site.admin_view(self.api_brands_view),
+                name='catalog_homebrand_api_brands',
+            ),
+        ]
+        return custom_urls + super().get_urls()
+
+    def api_brands_view(self, request):
+        from django.http import JsonResponse
+        brands = list(
+            Product.objects.exclude(brand='')
+            .values_list('brand', flat=True)
+            .distinct()
+            .order_by('brand')
+        )
+        return JsonResponse(brands, safe=False)
+
+    fieldsets = (
+        (None, {
+            'fields': ('name', 'logo', 'preview_logo', 'description'),
+        }),
+        ('显示控制', {
+            'fields': ('sort_order', 'is_active'),
+            'description': '调整品牌卡片的展示顺序与启用状态；排序值小的靠前。',
+        }),
+        ('时间', {
+            'fields': ('created_at', 'updated_at'),
+        }),
+    )
+
+    def preview_logo(self, obj):
+        if obj.logo:
+            return format_html(
+                '<img src="{}" style="max-height:60px;max-width:160px;background:#f8fafc;padding:6px;border-radius:6px;">',
+                obj.logo.url,
+            )
+        return '（未上传 Logo）'
+
+    preview_logo.short_description = 'Logo 预览'
+
+
+@admin.register(BrandOrder)
+class BrandOrderAdmin(admin.ModelAdmin):
+    """商品目录品牌筛选的自定义排序管理"""
+    list_display = ('brand', 'sort_order', 'is_active', 'updated_at')
+    list_filter = ('is_active',)
+    list_editable = ('sort_order', 'is_active')
+    search_fields = ('brand',)
+    list_per_page = 100
+
+    def get_form(self, request, obj=None, **kwargs):
+        """动态构建品牌下拉框，仅显示产品中已存在的品牌。"""
+        class BrandOrderDynamicForm(forms.ModelForm):
+            class Meta:
+                model = BrandOrder
+                fields = ('brand', 'sort_order', 'is_active')
+
+            def __init__(self, *args, **kwargs):
+                super().__init__(*args, **kwargs)
+                current = (
+                    self.initial.get('brand')
+                    or (self.instance.brand if self.instance and self.instance.pk else '')
+                )
+                existing = list(
+                    Product.objects.exclude(brand='')
+                    .order_by('brand')
+                    .values_list('brand', flat=True)
+                    .distinct()
+                )
+                # 已下架或已被删除但当前记录仍引用的品牌，也保留在下拉中
+                if current and current not in existing:
+                    existing.append(current)
+                self.fields['brand'] = forms.ChoiceField(
+                    label='品牌名称',
+                    required=True,
+                    choices=[('', '— 选择已有品牌 —')] + [(b, b) for b in existing],
+                )
+
+        kwargs['form'] = BrandOrderDynamicForm
+        return super().get_form(request, obj, **kwargs)
+
+    fieldsets = (
+        (None, {
+            'fields': ('brand',),
+            'description': '从下拉框中选择产品中已存在的品牌；如选项为空，请先在产品管理中录入品牌。',
+        }),
+        ('显示控制', {
+            'fields': ('sort_order', 'is_active'),
+            'description': '排序值小的靠前；关闭启用后该品牌不在商品目录筛选中显示。',
+        }),
+    )

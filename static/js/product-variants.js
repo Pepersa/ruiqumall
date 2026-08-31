@@ -15,6 +15,7 @@
   if (!results) return;
 
   let requestController = null;
+  let requestSeq = 0;
 
   function buildQueryString() {
     const params = new URLSearchParams();
@@ -42,6 +43,7 @@
       requestController.abort();
     }
     requestController = new AbortController();
+    const mySeq = ++requestSeq;
 
     const url = requestUrl
       ? new URL(requestUrl, window.location.origin)
@@ -61,6 +63,8 @@
       if (!response.ok) {
         throw new Error('Variant request failed');
       }
+      // 仅处理最新请求的响应，避免竞态
+      if (mySeq !== requestSeq) return;
 
       const documentCopy = new DOMParser().parseFromString(await response.text(), 'text/html');
       const nextRegion = documentCopy.querySelector('.variant-list-region');
@@ -81,12 +85,14 @@
         window.history.replaceState({}, '', `${url.pathname}${url.search}`);
       }
     } catch (error) {
-      if (error.name !== 'AbortError') {
+      if (error.name !== 'AbortError' && mySeq === requestSeq) {
         window.location.assign(url);
       }
     } finally {
-      results.classList.remove('is-loading');
-      form.removeAttribute('aria-busy');
+      if (mySeq === requestSeq) {
+        results.classList.remove('is-loading');
+        form.removeAttribute('aria-busy');
+      }
     }
   }
 
@@ -96,17 +102,6 @@
   form.addEventListener('change', (event) => {
     if (event.target.matches('input[type="checkbox"]')) {
       refreshVariants();
-    }
-  });
-
-  // Also trigger on label click (covers all cases)
-  form.addEventListener('click', (event) => {
-    const label = event.target.closest('.filter-chip');
-    if (label && form.contains(label)) {
-      const cb = label.querySelector('input[type="checkbox"]');
-      if (cb) {
-        refreshVariants();
-      }
     }
   });
 

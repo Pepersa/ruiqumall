@@ -3,13 +3,15 @@ import re
 from pathlib import Path
 
 from django.http import FileResponse, Http404
-from django.db.models import Count, Prefetch, Q, Value, Case, IntegerField, Sum, When
+from django.db.models import Count, Exists, OuterRef, Prefetch, Q, Value, Case, IntegerField, Sum, When
 from django.db.models.functions import Coalesce
 from django.core.paginator import Paginator
 from django.views.generic import DetailView, ListView, TemplateView
 
 from .grouping import _group_key, build_style_peer_map, collapse_products_by_style
-from .models import Category, CategoryAttribute, HomeCategory, HomeScene, Product, PublishStatus, SKU
+from .models import (
+    BrandOrder, Category, CategoryAttribute, HomeBrand, HomeCategory, HomeScene, Product, PublishStatus, SKU,
+)
 from .product_images import (
     IMAGE_EXTENSIONS,
     product_image_gallery,
@@ -39,7 +41,7 @@ def _has_color_code_marker(name):
     return bool(name and _HAS_COLOR_CODE.search(name))
 
 SORT_OPTIONS = {
-    'default': ('name', 'id'),
+    'default': ('sort_order', 'name', 'id'),
 }
 
 
@@ -191,6 +193,9 @@ class HomeView(TemplateView):
             HomeScene.objects.filter(is_active=True)
             .order_by('sort_order', 'id')
         )
+        context['home_brands'] = list(
+            HomeBrand.objects.filter(is_active=True).order_by('sort_order', 'id')
+        )
         return context
 
 
@@ -235,23 +240,25 @@ class ProductListView(ListView):
         self.selected_category = selected_category_from_slug(category_slug)
 
         if q:
-            # 多关键词以空格分隔，任一命中即匹配（OR 语义）。
-            # 为避免纯色号（如「大红」）把无关产品拉入，要求至少一个关键词命中
-            # 产品级字段（name/alias/brand/manufacturer_model/style_code/cas_no）；
-            # 其余关键词只要命中 SKU 字段即可。
+            # 多关键词以空格分隔。多关键词同时出现时，按「匹配关键词数」过滤 + 排序，
+            # 避免单关键词命中把无关产品拉入（例如「三和 手摇自动喷漆 国标色」
+            # 只保留同时命中 ≥2 个关键词的产品，「三和」单关键词命中的整条产品线会被剔除）。
             self.search_keywords = [w for w in q.split() if w]
+            n_keywords = len(self.search_keywords)
             combined = Q()
             for kw in self.search_keywords:
                 kw_q = (
                     Q(name__icontains=kw)
                     | Q(alias__icontains=kw)
                     | Q(cas_no__icontains=kw)
+                    | Q(style_code__icontains=kw)
                     | Q(brand__icontains=kw)
                     | Q(manufacturer_model__icontains=kw)
                     | Q(skus__internal_sku_code__icontains=kw)
                     | Q(skus__jst_sku_id__icontains=kw)
                     | Q(skus__sku_attribute_text__icontains=kw)
                     | Q(skus__color__icontains=kw)
+                    | Q(skus__capacity__icontains=kw)
                     | Q(skus__package_spec__icontains=kw)
                     | Q(skus__attributes__icontains=kw)
                 )
@@ -266,16 +273,95 @@ class ProductListView(ListView):
                     | Q(alias__icontains=kw)
                     | Q(brand__icontains=kw)
                     | Q(manufacturer_model__icontains=kw)
+                    | Q(style_code__icontains=kw)
+                    | Q(cas_no__icontains=kw)
                 )
             queryset = queryset.filter(identity_field_q)
-            # 统计产品身份字段命中关键词数：用于把"全名都中"的产品排在前面，
-            # 减少「色号单字」拉入的无关产品对用户决策的干扰。
+
+            # 统计每个产品**实际匹配了几个不同关键词**。
+            # 每个关键词构造一个 Case：产品级字段命中 或 任一 SKU 命中 → 1，否则 0；
+            # 用 Exists 子查询做 SKU 命中检测，避免 JOIN 翻倍。最后把这些 Case 直接相加，
+            # 得到 0..N 的「命中关键词数」。
+            per_keyword_cases = []
+            for kw in self.search_keywords:
+                sku_match_subq = SKU.objects.filter(product_id=OuterRef('pk')).filter(
+                    Q(internal_sku_code__icontains=kw)
+                    | Q(jst_sku_id__icontains=kw)
+                    | Q(sku_attribute_text__icontains=kw)
+                    | Q(color__icontains=kw)
+                    | Q(capacity__icontains=kw)
+                    | Q(package_spec__icontains=kw)
+                    | Q(attributes__icontains=kw)
+                )
+                product_match_q = (
+                    Q(name__icontains=kw)
+                    | Q(alias__icontains=kw)
+                    | Q(brand__icontains=kw)
+                    | Q(manufacturer_model__icontains=kw)
+                    | Q(cas_no__icontains=kw)
+                    | Q(style_code__icontains=kw)
+                )
+                per_keyword_cases.append(
+                    Case(
+                        When(product_match_q | Exists(sku_match_subq), then=Value(1)),
+                        default=Value(0),
+                        output_field=IntegerField(),
+                    )
+                )
+            matched_keyword_count_expr = Value(0)
+            for case_expr in per_keyword_cases:
+                matched_keyword_count_expr = matched_keyword_count_expr + case_expr
+            queryset = queryset.annotate(matched_keyword_count=matched_keyword_count_expr)
+
+            # 多关键词严格过滤：
+            # - 1 个关键词：保留任一字段命中（与原行为一致）
+            # - ≥2 个关键词：要求**全部命中**（避免「三和 手摇自动喷漆 国标色」
+            #   这种查询被「三和」单关键词命中整条产品线，也避免属性里恰好含
+            #   「国标色」字样的产品被混入）。
+            #   如果查询词超过 4 个，则放宽到 N-1（容忍 1 个错字/弱关键词）。
+            if n_keywords <= 1:
+                min_match = 1
+            elif n_keywords == 2:
+                min_match = 2
+            elif n_keywords == 3:
+                min_match = 3
+            else:
+                min_match = n_keywords - 1
+            queryset = queryset.filter(matched_keyword_count__gte=min_match)
+
+            # 多层级相关性打分：
+            # - SKU 编码精确匹配 / 开头匹配：最高分（用户多半在搜具体型号）
+            # - 产品名 / 品牌 / 制造商型号开头匹配：高
+            # - 包含匹配：中
+            # - 颜色 / 容量 / 包规命中：低
             when_clauses = []
             for kw in self.search_keywords:
-                when_clauses.append(When(
-                    Q(name__icontains=kw) | Q(alias__icontains=kw) | Q(brand__icontains=kw) | Q(manufacturer_model__icontains=kw),
-                    then=1,
-                ))
+                # SKU 内部编码开头匹配（最常见：用户拷贝一段 SKU 前缀）
+                when_clauses.append(When(skus__internal_sku_code__istartswith=kw, then=80))
+                # SKU 内部编码精确包含
+                when_clauses.append(When(skus__internal_sku_code__iexact=kw, then=100))
+                when_clauses.append(When(skus__internal_sku_code__icontains=kw, then=40))
+                # 产品名 / 别名开头匹配
+                when_clauses.append(When(Q(name__istartswith=kw) | Q(alias__istartswith=kw), then=70))
+                # 产品名 / 别名包含
+                when_clauses.append(When(Q(name__icontains=kw) | Q(alias__icontains=kw), then=30))
+                # 品牌精确 / 开头 / 包含
+                when_clauses.append(When(brand__iexact=kw, then=90))
+                when_clauses.append(When(brand__istartswith=kw, then=60))
+                when_clauses.append(When(brand__icontains=kw, then=25))
+                # 制造商型号
+                when_clauses.append(When(manufacturer_model__istartswith=kw, then=55))
+                when_clauses.append(When(manufacturer_model__icontains=kw, then=25))
+                # CAS / style_code
+                when_clauses.append(When(cas_no__icontains=kw, then=50))
+                when_clauses.append(When(style_code__icontains=kw, then=45))
+                # SKU 其他属性
+                when_clauses.append(When(skus__color__icontains=kw, then=15))
+                when_clauses.append(When(skus__capacity__icontains=kw, then=15))
+                when_clauses.append(When(skus__package_spec__icontains=kw, then=10))
+                when_clauses.append(When(skus__sku_attribute_text__icontains=kw, then=10))
+                when_clauses.append(When(skus__attributes__icontains=kw, then=10))
+
             score = Coalesce(Sum(
                 Case(*when_clauses, default=0, output_field=IntegerField()),
             ), 0)
@@ -304,8 +390,9 @@ class ProductListView(ListView):
 
         order_clauses = list(SORT_OPTIONS[self.sort])
         if getattr(self, 'search_keywords', []):
-            # 搜索时让「全名命中」的产品排在最前
-            order_clauses = ['-relevance_score'] + order_clauses
+            # 搜索时按「命中关键词数 → 相关性 → 默认排序」排，命中关键词数最多的产品排在最前。
+            order_clauses = ['-matched_keyword_count', '-relevance_score'] + order_clauses
+
         queryset = (
             queryset.annotate(sku_count=Count('skus', distinct=True))
             .distinct()
@@ -376,13 +463,26 @@ class ProductListView(ListView):
             f'{selected_category.name} 之子分类' if selected_category else '全部分类'
         )
 
-        # 第 2 行 chip：品牌
+        # 第 2 行 chip：品牌（支持后台自定义排序）
         brand_qs = filtered_products.exclude(brand='')
         if selected_category:
             brand_qs = brand_qs.filter(category_id__in=selected_category.descendant_ids())
-        context['brands'] = list(
-            brand_qs.values_list('brand', flat=True).distinct().order_by('brand')
+        # 获取所有品牌并关联 BrandOrder 排序配置
+        from django.db.models.functions import Concat
+        from django.db.models import F, OuterRef, Subquery
+        brand_list = list(
+            brand_qs.order_by('brand').values_list('brand', flat=True).distinct()
         )
+        # 按 BrandOrder.sort_order 排序，未配置的按字母顺序排后面
+        ordered_brands = list(
+            BrandOrder.objects.filter(
+                brand__in=brand_list,
+                is_active=True,
+            ).values_list('brand', flat=True).order_by('sort_order')
+        )
+        # 未配置 BrandOrder 的品牌按字母顺序排在后面
+        unordered_brands = sorted([b for b in brand_list if b not in ordered_brands])
+        context['brands'] = ordered_brands + unordered_brands
 
         context['colors'] = base_skus.exclude(color='').values_list('color', flat=True).distinct().order_by('color')[:80]
         context['package_specs'] = (
@@ -391,7 +491,6 @@ class ProductListView(ListView):
         context['stock_statuses'] = SKU._meta.get_field('stock_status').choices
         context['dynamic_attribute_filters'] = dynamic_attribute_filters
         context['filters'] = self.request.GET
-        context['sort'] = getattr(self, 'sort', 'default')
         context['page_size'] = self.get_paginate_by(self.object_list)
         context['page_size_options'] = self.page_size_options
 
@@ -429,10 +528,6 @@ class ProductListView(ListView):
         category_query.pop('category', None)
         category_query.pop('brand', None)
         context['category_querystring'] = category_query.urlencode()
-
-        sort_query = query.copy()
-        sort_query.pop('sort', None)
-        context['sort_querystring'] = sort_query.urlencode()
 
         paginator = context.get('paginator')
         page_obj = context.get('page_obj')
@@ -541,36 +636,63 @@ class ProductDetailView(DetailView):
         variant_query = self.request.GET.get('variant_q', '').strip().casefold()
         variant_filters = {}
         variant_filter_groups = []
+
+        # SKU 模型字段（capacity / color）也作为筛选维度，无论分类属性是否配置都显示
+        for field_code, field_name, label in [
+            ('capacity', 'capacity', '容量'),
+            ('color', 'color', '颜色'),
+        ]:
+            values = sorted(
+                {str(getattr(sku, field_code, '') or '').strip()
+                 for sku in filter_value_source} - {''},
+                key=natural_value_key,
+            )
+            param = f'variant_{field_code}'
+            selected_values = [v for v in self.request.GET.getlist(param) if v]
+            if selected_values:
+                variant_filters[field_code] = set(selected_values)
+            if values:
+                variant_filter_groups.append({
+                    'attribute': type('Obj', (), {'code': field_code, 'name': label})(),
+                    'param': param,
+                    'values': values,
+                    'selected_values': selected_values,
+                })
+
+        # CategoryAttribute.code 与 SKU/Product 模型字段名的映射（因历史命名差异）
+        SKU_FIELD_MAP = {
+            'volume': 'capacity',
+            'factory_model': 'manufacturer_model',
+            'product_name': 'name',
+        }
+
+        def _sku_attr_value(sku, code):
+            """从 SKU.attributes JSON 取值，fallback 到 SKU/product 模型字段。"""
+            if isinstance(sku.attributes, dict):
+                v = sku.attributes.get(code, None)
+                if v not in (None, ''):
+                    return str(v).strip()
+            # fallback 到 SKU 模型字段（含字段名映射）
+            model_code = SKU_FIELD_MAP.get(code, code)
+            v = getattr(sku, model_code, None)
+            if v not in (None, ''):
+                return str(v).strip()
+            # fallback 到 product 字段（含字段名映射）
+            v = getattr(sku.product, model_code, None)
+            if v not in (None, ''):
+                return str(v).strip()
+            return ''
+
         for attribute in detail_attributes:
             if not attribute.is_filterable:
                 continue
             if attribute.code == 'color_code':
                 continue
+            # 避免与上方 SKU 字段重复（如分类属性也定义了 capacity / color）
+            if attribute.code in ('capacity', 'color'):
+                continue
             param = f'variant_{attribute.code}'
             selected_values = [value for value in self.request.GET.getlist(param) if value]
-            # CategoryAttribute.code 与 SKU/Product 模型字段名的映射（因历史命名差异）
-            SKU_FIELD_MAP = {
-                'volume': 'capacity',
-                'factory_model': 'manufacturer_model',
-                'product_name': 'name',
-            }
-
-            def _sku_attr_value(sku, code):
-                """从 SKU.attributes JSON 取值，fallback 到 SKU/product 模型字段。"""
-                if isinstance(sku.attributes, dict):
-                    v = sku.attributes.get(code, None)
-                    if v not in (None, ''):
-                        return str(v).strip()
-                # fallback 到 SKU 模型字段（含字段名映射）
-                model_code = SKU_FIELD_MAP.get(code, code)
-                v = getattr(sku, model_code, None)
-                if v not in (None, ''):
-                    return str(v).strip()
-                # fallback 到 product 字段（含字段名映射）
-                v = getattr(sku.product, model_code, None)
-                if v not in (None, ''):
-                    return str(v).strip()
-                return ''
 
             values = sorted(
                 {
@@ -588,16 +710,56 @@ class ProductDetailView(DetailView):
 
         # 3. 过滤 & 排序
         variant_skus = []
-        # 多关键词拆分：与列表页 q 语义一致，拆词任一命中即匹配（避免长串整词搜不到）
-        query_terms = [t for t in variant_query.split() if t] if variant_query else []
-        # sku_focus_mode 下 all_skus 已被裁成 1 条；搜索要遍历 product 全量 SKU
+        # 多关键词：OR 语义，任一关键词命中即包含；按命中质量打分用于排序
+        query_terms = [t.casefold() for t in variant_query.split() if t] if variant_query else []
         search_pool = skus if sku_focus_mode else all_skus
+
+        def _sku_search_score(sku):
+            """返回相关性总分：精确匹配 > 开头匹配 > 包含匹配，无匹配返回 0。"""
+            if not query_terms:
+                return 1  # 无搜索词保留在原排序位置
+            score = 0
+            code = sku.internal_sku_code.casefold()
+            jst = (sku.jst_sku_id or '').casefold()
+            attr_text = (sku.sku_attribute_text or '').casefold()
+            display = sku.display_name.casefold()
+            color = (sku.color or '').casefold()
+            capacity = (sku.capacity or '').casefold()
+            product_name = (sku.product.name or '').casefold()
+            manufacturer_model = (sku.product.manufacturer_model or '').casefold()
+            # 从 attributes JSON 中也收集文本
+            extra_attrs = []
+            if isinstance(sku.attributes, dict):
+                for v in sku.attributes.values():
+                    if v and str(v).strip():
+                        extra_attrs.append(str(v).casefold())
+            extra_text = ' '.join(extra_attrs)
+            for term in query_terms:
+                # 精确 == 最高分
+                if term == code or term == jst or term == attr_text:
+                    score += 100
+                # 开头匹配
+                elif code.startswith(term) or jst.startswith(term) or attr_text.startswith(term):
+                    score += 70
+                elif display.startswith(term) or product_name.startswith(term) or manufacturer_model.startswith(term):
+                    score += 60
+                # 包含匹配
+                elif term in code or term in jst or term in attr_text:
+                    score += 40
+                elif term in display or term in product_name or term in manufacturer_model:
+                    score += 30
+                elif term in color or term in capacity or term in extra_text:
+                    score += 20
+                else:
+                    # 其他属性字段（名称、code 等）
+                    found = any(term in _sku_attr_value(sku, attr.code).casefold()
+                                for attr in detail_attributes)
+                    if found:
+                        score += 10
+            return score
+
         for sku in search_pool:
-            searchable = ' '.join(
-                [sku.display_name, sku.internal_sku_code, sku.jst_sku_id, sku.sku_attribute_text]
-                + [_sku_attr_value(sku, attr.code) for attr in detail_attributes]
-            ).casefold()
-            if query_terms and not any(term in searchable for term in query_terms):
+            if query_terms and _sku_search_score(sku) == 0:
                 continue
             if any(_sku_attr_value(sku, code) not in values for code, values in variant_filters.items()):
                 continue
@@ -620,15 +782,24 @@ class ProductDetailView(DetailView):
         if current_pk:
             variant_skus = [sku for sku in variant_skus if str(sku.pk) != current_pk]
 
-        variant_skus.sort(
-            key=lambda sku: (
-                tuple(
-                    natural_value_key(_sku_attr_value(sku, attribute.code))
-                    for attribute in detail_attributes
-                ),
-                sku.internal_sku_code,
+        # 有搜索词时按相关性降序 + 订货编码升序；无搜索词时保持自然排序
+        if query_terms:
+            variant_skus.sort(
+                key=lambda sku: (
+                    -_sku_search_score(sku),
+                    sku.internal_sku_code,
+                )
             )
-        )
+        else:
+            variant_skus.sort(
+                key=lambda sku: (
+                    tuple(
+                        natural_value_key(_sku_attr_value(sku, attribute.code))
+                        for attribute in detail_attributes
+                    ),
+                    sku.internal_sku_code,
+                )
+            )
 
         variant_paginator = Paginator(variant_skus, 5)
         variant_page_obj = variant_paginator.get_page(self.request.GET.get('variant_page', 1))
@@ -660,6 +831,91 @@ class ProductDetailView(DetailView):
         context['product_documents'] = product_documents(self.object)
 
         return context
+
+
+def _search_suggest_queryset(q):
+    """构造搜索建议的候选集（按相关性排序的产品 + 命中 SKU 的样品）。
+
+    返回的是 (suggestions, products)，suggestions 是给前端下拉的扁平结构。
+    """
+    q = (q or '').strip()
+    if not q:
+        return [], []
+    keywords = [w for w in q.split() if w]
+    if not keywords:
+        return [], []
+    # 1) 产品候选：name / alias / brand / manufacturer_model / style_code / cas_no 命中
+    product_q = Q()
+    for kw in keywords:
+        product_q |= (
+            Q(name__icontains=kw)
+            | Q(alias__icontains=kw)
+            | Q(brand__icontains=kw)
+            | Q(manufacturer_model__icontains=kw)
+            | Q(style_code__icontains=kw)
+            | Q(cas_no__icontains=kw)
+        )
+    products = list(
+        Product.objects.filter(status=PublishStatus.PUBLISHED)
+        .filter(product_q)
+        .select_related('category')
+        .only('pk', 'name', 'alias', 'brand', 'manufacturer_model', 'style_code')
+        .order_by('name')[:60]
+    )
+    # 2) SKU 候选：用于在建议里附带「内部 SKU 编码」
+    sku_q = Q()
+    for kw in keywords:
+        sku_q |= (
+            Q(internal_sku_code__icontains=kw)
+            | Q(jst_sku_id__icontains=kw)
+            | Q(sku_attribute_text__icontains=kw)
+            | Q(product__name__icontains=kw)
+            | Q(product__alias__icontains=kw)
+            | Q(product__brand__icontains=kw)
+            | Q(product__manufacturer_model__icontains=kw)
+        )
+    skus = list(
+        SKU.objects.filter(status=PublishStatus.PUBLISHED, product__status=PublishStatus.PUBLISHED)
+        .filter(sku_q)
+        .select_related('product')
+        .only('pk', 'internal_sku_code', 'product__pk', 'product__name', 'product__alias', 'product__brand')
+        .order_by('internal_sku_code')[:60]
+    )
+    return products, skus
+
+
+def search_suggest(request):
+    """搜索建议 API：返回 JSON 列表，前端用于 autocomplete。"""
+    from django.http import JsonResponse
+    q = request.GET.get('q', '').strip()
+    if not q:
+        return JsonResponse({'products': [], 'skus': []})
+    products, skus = _search_suggest_queryset(q)
+    payload = {
+        'products': [
+            {
+                'pk': p.pk,
+                'name': p.name,
+                'alias': p.alias or '',
+                'brand': p.brand or '',
+                'manufacturer_model': p.manufacturer_model or '',
+                'style_code': p.style_code or '',
+                'url': p.get_absolute_url(),
+            }
+            for p in products
+        ],
+        'skus': [
+            {
+                'pk': s.pk,
+                'internal_sku_code': s.internal_sku_code,
+                'product_pk': s.product_id,
+                'product_name': s.product.name,
+                'url': s.product.get_absolute_url() + f'?sku={s.pk}',
+            }
+            for s in skus
+        ],
+    }
+    return JsonResponse(payload)
 
 
 def product_media(request, asset_path):

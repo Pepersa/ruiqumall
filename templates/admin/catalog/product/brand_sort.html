@@ -1,0 +1,90 @@
+{% extends "admin/base_site.html" %}
+{% load i18n %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+  <a href="{% url 'admin:index' %}">{% translate 'Home' %}</a>
+  &rsaquo; <a href="{% url 'admin:app_list' app_label=opts.app_label %}">{{ opts.app_config.verbose_name }}</a>
+  &rsaquo; <a href="{% url 'admin:catalog_product_changelist' %}">{{ opts.verbose_name_plural|capfirst }}</a>
+  &rsaquo; 按品牌调整排序号
+</div>
+{% endblock %}
+
+{% block content %}
+<div id="content-main">
+  <h1>按品牌调整排序号</h1>
+  <p>选择一个品牌后，下方会列出该品牌下的所有产品。修改每行最左侧的「排序号」（值越小越靠前），提交后立即生效。</p>
+
+  <form method="get" class="module aligned">
+    <fieldset class="module aligned">
+      <div class="form-row">
+        <label for="id_brand">选择品牌</label>
+        <select name="brand" id="id_brand">
+          <option value="">— 请选择品牌 —</option>
+          {% for brand in brands %}
+            <option value="{{ brand }}" {% if brand == selected_brand %}selected{% endif %}>{{ brand }}</option>
+          {% endfor %}
+        </select>
+      </div>
+    </fieldset>
+    <div class="submit-row">
+      <input type="submit" value="查看产品" class="default">
+      <a href="{% url 'admin:catalog_product_changelist' %}" class="button cancel-link">返回列表</a>
+    </div>
+  </form>
+
+  {% if selected_brand %}
+    <h2 style="margin-top:32px">品牌「{{ selected_brand }}」下的产品（按当前排序展示）</h2>
+    {% if products %}
+      <form method="post">
+        {% csrf_token %}
+        <input type="hidden" name="brand" value="{{ selected_brand }}">
+        <table class="module aligned" style="width:100%; border-collapse:collapse;">
+          <thead>
+            <tr style="background:#f6f6f6;">
+              <th style="padding:8px; width:90px; text-align:center;">排序号</th>
+              <th style="padding:8px;">产品名称</th>
+              <th style="padding:8px; width:160px;">分类</th>
+              <th style="padding:8px; width:90px; text-align:center;">状态</th>
+              <th style="padding:8px; width:90px; text-align:center;">SKU 数</th>
+              <th style="padding:8px; width:120px; text-align:center;">款式编码</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for product in products %}
+              <tr style="border-top:1px solid #eee;">
+                <td style="padding:6px; text-align:center;">
+                  <input type="number" name="order_{{ product.pk }}" value="{{ product.sort_order }}" min="0" step="1" style="width:72px; text-align:center;">
+                </td>
+                <td style="padding:6px;">
+                  <a href="{% url 'admin:catalog_product_change' product.pk %}" target="_blank">{{ product.name }}</a>
+                  {% if product.manufacturer_model %}<div style="color:#666; font-size:12px;">型号：{{ product.manufacturer_model }}</div>{% endif %}
+                </td>
+                <td style="padding:6px;">
+                  {% if product.category %}
+                    {{ product.category.name }}
+                  {% else %}
+                    <span style="color:#999;">未分类</span>
+                  {% endif %}
+                </td>
+                <td style="padding:6px; text-align:center;">{{ product.get_status_display }}</td>
+                <td style="padding:6px; text-align:center;">{{ product.skus.count }}</td>
+                <td style="padding:6px; text-align:center;"><code>{{ product.style_code }}</code></td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        <div class="submit-row">
+          <input type="submit" value="保存排序号" class="default">
+          <a href="?brand={{ selected_brand }}" class="button cancel-link">取消</a>
+        </div>
+        <p style="margin-top:12px; color:#666; font-size:13px;">
+          提示：相同排序号会按产品名升序排列。建议给核心商品设置 10、20、30 这种间隔，方便后续插入新商品时无需全部重排。
+        </p>
+      </form>
+    {% else %}
+      <p style="color:#ba2121;">品牌「{{ selected_brand }}」下没有可排序的产品。</p>
+    {% endif %}
+  {% endif %}
+</div>
+{% endblock %}

@@ -19,13 +19,12 @@ from django.conf.urls.static import static
 from django.contrib import admin
 from django.urls import include, path
 
-from catalog.views import HomeSceneView, HomeView
+from catalog.views import HomeView
 
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('accounts/', include('accounts.urls')),
     path('', HomeView.as_view(), name='home'),
-    path('scene/<slug:slug>/', HomeSceneView.as_view(), name='home_scene'),
     path('products/', include('catalog.urls')),
     path('cart/', include('cart.urls')),
     path('orders/', include('orders.urls')),

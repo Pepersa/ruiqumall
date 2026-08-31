@@ -133,7 +133,6 @@
       <div class="filter-panels">
         {% if variant_filter_groups %}
           {% for group in variant_filter_groups %}
-            {% if group.attribute.code in 'volume,color' %}
             {% with count=group.values|length %}
             <div class="filter-panel"
                  data-filter-panel
@@ -158,7 +157,6 @@
               </div>
             </div>
             {% endwith %}
-            {% endif %}
           {% endfor %}
         {% else %}
           <p class="empty">该系列暂无可筛选属性，请使用下方搜索框查找型号。</p>
