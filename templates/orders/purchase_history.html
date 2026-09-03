@@ -1,0 +1,218 @@
+{% extends "base.html" %}
+{% load catalog_extras %}
+{% load static %}
+{% block title %}历史采购{% endblock %}
+
+{% block content %}
+
+<section class="page-head">
+  <h1>历史采购</h1>
+  <p>快速找到您经常订购的商品，一键加入购物车。</p>
+</section>
+
+<!-- ── 常购商品 ── -->
+<section class="profile-section" style="margin-top: 8px;">
+  <div class="section-title">
+    <h2>常购商品</h2>
+    <span class="section-title-meta">根据您的历史订单统计</span>
+  </div>
+
+  {% if top_skus %}
+    <div class="product-grid freq-skus-grid">
+      {% for item in top_skus %}
+        {% with sku=item.sku_obj %}
+          {% with product=sku.product %}
+          <article class="product-card" data-sku-id="{{ sku.pk }}">
+            <a class="product-image" href="{{ sku.product.get_absolute_url }}">
+              {% if product.brand %}<span class="product-brand-corner">{{ product.brand }}</span>{% endif %}
+              <img src="{{ product.main_image_url|default:product.display_image_url }}" alt="{{ sku.display_name }}" referrerpolicy="no-referrer">
+            </a>
+            <div class="product-body">
+              <a class="product-name" href="{{ sku.product.get_absolute_url }}">
+                {{ product.name }}{% if product.manufacturer_model %} {{ product.manufacturer_model }}{% endif %}{% if sku.color %} {{ sku.color }}{% endif %}
+              </a>
+              {% if sku.internal_sku_code %}
+                <div class="card-sku-code">商品编码：{{ sku.internal_sku_code }}</div>
+              {% endif %}
+              <div class="card-specs-row">
+                {% if sku.capacity %}<span class="spec-tag"><img src="{% static 'img/icon.png' %}" alt="容量" class="spec-icon">{{ sku.capacity }}</span>{% endif %}
+                {% if sku.mpq %}<span class="spec-tag"><img src="{% static 'img/icon.png' %}" alt="容量" class="spec-icon">MPQ {{ sku.mpq|qty }}</span>{% endif %}
+              </div>
+              {% if request.user.is_authenticated %}
+                <div class="card-price card-price--top">
+                  <div class="card-price-main">
+                    {% if sku.list_price %}<span class="price-list">¥{{ sku.list_price }}</span>{% endif %}
+                    {% if sku.price %}<span class="price">¥{{ sku.price }}</span>{% endif %}
+                  </div>
+                  <span class="product-brand-tag purchase-count">采购 {{ item.order_count }} 次</span>
+                </div>
+                <form class="card-quick-buy js-add-to-cart" action="{% url 'cart:add' sku.id %}" method="post" data-image-url="{{ product.main_image_url|default:product.display_image_url }}">
+                  {% csrf_token %}
+                  <input type="number" name="qty" value="{{ sku.moq|qty }}" min="{{ sku.moq|qty }}" step="{{ sku.order_step|qty }}" aria-label="数量">
+                  {% if sku.can_add_to_cart %}
+                    <button type="submit">加入购物车</button>
+                  {% else %}
+                    <button type="button" disabled>联系销售</button>
+                  {% endif %}
+                </form>
+              {% else %}
+                <a class="card-quick-buy ghost-button" href="{% url 'accounts:login' %}?next={{ product.get_absolute_url|urlencode }}">登录后查看价格</a>
+                <div class="meta" style="margin-top: 4px;">
+                  <span class="product-brand-tag purchase-count">采购 {{ item.order_count }} 次</span>
+                </div>
+              {% endif %}
+            </div>
+          </article>
+          {% endwith %}
+        {% endwith %}
+      {% endfor %}
+    </div>
+  {% else %}
+    <div class="empty-state">
+      <p>暂无采购记录，<strong>先去看看商品</strong>吧。</p>
+      <a class="ghost-button" href="{% url 'catalog:product_list' %}">进入产品目录</a>
+    </div>
+  {% endif %}
+</section>
+
+<!-- ── 最近订单 ── -->
+<section class="profile-section" style="margin-top: 32px;">
+  <div class="section-title">
+    <h2>最近订单</h2>
+    <a class="section-title-link" href="{% url 'accounts:profile_orders' %}">查看全部</a>
+  </div>
+
+  {% if recent_orders %}
+    <div class="table-wrap">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>订单号</th>
+            <th>状态</th>
+            <th>商品数</th>
+            <th>下单时间</th>
+            <th>金额</th>
+            <th style="text-align:right;">再次采购</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for order in recent_orders %}
+            <tr>
+              <td>
+                <a href="{{ order.get_absolute_url }}">{{ order.order_no }}</a>
+              </td>
+              <td>{{ order.get_status_display }}</td>
+              <td>{{ order.items.count }} 件</td>
+              <td>{{ order.created_at|date:"Y-m-d H:i" }}</td>
+              <td>
+                {% if order.total_amount %}
+                  <strong style="color: var(--warn);">{{ order.total_amount|qty }}</strong>
+                {% else %}
+                  待计算
+                {% endif %}
+              </td>
+              <td style="text-align:right;">
+                <form method="post" action="{% url 'orders:reorder' order.order_no %}">
+                  {% csrf_token %}
+                  <button type="submit" class="ghost-button" style="font-size: 13px; min-height: 0; padding: 6px 14px; width: auto;">
+                    再次采购
+                  </button>
+                </form>
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% else %}
+    <div class="empty-state">
+      <p>暂无订单记录。</p>
+    </div>
+  {% endif %}
+</section>
+
+{% endblock %}
+
+{% block extra_js %}
+<style>
+  /* 常购商品卡片：缩小但紧凑展示 */
+  .freq-skus-grid {
+    display: grid;
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+    gap: 8px;
+    margin-top: 8px;
+    font-size: 12px;
+  }
+  .freq-skus-grid .product-image img { background: var(--soft); }
+  .freq-skus-grid .product-body {
+    padding: 6px 8px 8px;
+    gap: 3px;
+  }
+  .freq-skus-grid .product-name {
+    font-size: 12.5px;
+    line-height: 1.25;
+    -webkit-line-clamp: 2;
+  }
+  .freq-skus-grid .card-sku-code { font-size: 11px; }
+  .freq-skus-grid .card-specs-row { font-size: 11px; gap: 4px; }
+  .freq-skus-grid .spec-tag {
+    padding: 1px 5px;
+    font-size: 10.5px;
+  }
+  .freq-skus-grid .card-price {
+    font-size: 12px;
+    margin: 0 0 4px;
+    padding: 2px 0 4px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px;
+  }
+  .freq-skus-grid .card-price .price { font-size: 13px; }
+  .freq-skus-grid .card-price-main {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+    min-width: 0;
+  }
+  .freq-skus-grid .purchase-count {
+    flex-shrink: 0;
+    font-size: 10.5px;
+    color: var(--muted);
+    background: var(--soft);
+    padding: 1px 6px;
+    border-radius: 999px;
+    white-space: nowrap;
+  }
+  .freq-skus-grid .card-quick-buy {
+    gap: 4px;
+    margin-top: 2px;
+  }
+  .freq-skus-grid .card-quick-buy input {
+    width: 42px;
+    padding: 4px 6px;
+    font-size: 12px;
+  }
+  .freq-skus-grid .card-quick-buy button {
+    padding: 5px 8px;
+    font-size: 12px;
+    min-height: 0;
+    flex: 1;
+  }
+  .freq-skus-grid .meta { font-size: 11px; margin-top: 2px; }
+  .freq-skus-grid .product-brand-corner {
+    font-size: 10px;
+    padding: 2px 7px;
+    left: 5px; bottom: 5px;
+  }
+  @media (max-width: 1100px) {
+    .freq-skus-grid { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+  }
+  @media (max-width: 820px) {
+    .freq-skus-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  }
+  @media (max-width: 560px) {
+    .freq-skus-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  }
+</style>
+{% endblock %}

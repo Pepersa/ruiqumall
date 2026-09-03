@@ -1,17 +1,20 @@
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.db import transaction
 from django.shortcuts import get_object_or_404, redirect, render
+from django.views.decorators.http import require_POST
 
 from accounts.forms import ShippingAddressForm
 from accounts.services import ensure_user_profile, sync_customer_from_profile
-from cart.views import CART_SESSION_KEY, cart_items
+from cart.views import CART_SESSION_KEY, _get_cart, _normalize_qty, cart_items
+from catalog.models import SKU
+from catalog.pricing import resolve_unit_price
 
 from .forms import OrderConfirmForm
 from .models import Order, OrderItem
-from catalog.pricing import resolve_unit_price
+from .services import purchase_history_data
 
 
 def get_default_shipping_address(user):
@@ -175,4 +178,63 @@ def order_detail(request, order_no):
         verified = True
     return render(request, 'orders/detail.html', {'order': order, 'verified': verified, 'mobile': mobile})
 
-# Create your views here.
+
+# ── 历史采购 ──────────────────────────────────────────────
+
+@login_required
+def purchase_history(request):
+    """
+    历史采购页：
+    - 常购商品：按历史订单聚合购买次数最多的 SKU
+    - 最近订单：最近 20 笔有效订单，支持一键再次采购
+    """
+    top_skus, recent_orders = purchase_history_data(request.user, top_n=12, recent_n=20)
+    if top_skus is None and recent_orders is None:
+        # 未关联客户，显示空状态
+        top_skus, recent_orders = [], []
+
+    return render(request, 'orders/purchase_history.html', {
+        'top_skus': top_skus,
+        'recent_orders': recent_orders,
+    })
+
+
+@login_required
+@require_POST
+def reorder(request, order_no):
+    """
+    一键再次采购：将指定订单的所有 SKU 加入购物车，然后重定向到购物车。
+    - 跳过已下架 / 缺货的 SKU（静默忽略）
+    - 累加已有数量
+    """
+    order = get_object_or_404(Order, order_no=order_no)
+
+    # 权限校验：只能重新采购自己的订单
+    if not request.user.is_staff and order.customer.user_id != request.user.id:
+        messages.error(request, '无权操作该订单。')
+        return redirect('cart:detail')
+
+    cart = _get_cart(request)
+    added_count = 0
+    skipped_count = 0
+
+    for item in order.items.select_related('sku').all():
+        sku = item.sku
+        if not sku or not sku.can_add_to_cart:
+            skipped_count += 1
+            continue
+        qty = _normalize_qty(sku, item.qty)
+        existing = _parse_qty(cart.get(str(sku.pk), ''), Decimal('0'))
+        cart[str(sku.pk)] = str(existing + qty)
+        added_count += 1
+
+    request.session.modified = True
+
+    if added_count > 0:
+        messages.success(request, f'已加入购物车 {added_count} 件商品。')
+    elif skipped_count > 0:
+        messages.warning(request, '该订单中所有商品当前均不可订购。')
+    else:
+        messages.info(request, '该订单中没有商品可再次采购。')
+
+    return redirect('cart:detail')

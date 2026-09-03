@@ -20,6 +20,9 @@
       </form>
     </div>
     <nav class="top-nav">
+      {% if request.user.is_authenticated %}
+        <a href="{% url 'orders:history' %}">历史采购</a>
+      {% endif %}
       <a href="{% url 'cart:detail' %}" id="cart-nav-link" class="cart-nav-link">
         购物车
         {% if cart_has_items %}<span class="cart-badge">{{ cart_item_count|qty }}</span>{% endif %}
